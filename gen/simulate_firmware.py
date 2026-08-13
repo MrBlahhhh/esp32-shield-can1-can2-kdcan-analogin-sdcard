@@ -62,10 +62,11 @@ BUILD = os.path.join(PROJ, ".build", "fwsim")
 R53_SKETCH = os.path.join(PROJ, "firmware", "vendor", "r53_shiftlight_wideband", "main.cpp")
 AUTOSPORT_SKETCH = os.path.join(PROJ, "firmware", "esp32_shiftlight_wideband", "src", "main.cpp")
 
-# The carrier has ONE divider ratio: 2.21 / 13.21, spanning 0-16 V so that a
-# 5 V and a 12 V sensor both fit without a jumper. RANGE_5V is what the R53
-# board's own front end does, and is kept only for the control comparison.
-RANGE_16V = 0.1673
+# The carrier has ONE divider ratio: 2.2 / 13.2, which is exactly 1/6,
+# spanning 0-16 V so that a 5 V and a 12 V sensor both fit without a jumper.
+# RANGE_5V is what the R53 board's own front end does, and is kept only for
+# the control comparison.
+RANGE_16V = 1.0 / 6.0
 RANGE_5V = 0.5769          # the s3zero control board, not this one
 ADC_FULLSCALE = 3.10
 
@@ -923,9 +924,9 @@ def study_worst_case(exes):
     print("  a car cabin is not a kind place to keep one.")
     print("    %-26s %10s %10s %9s" % ("window", "closed at", "collapse", "verdict"))
     rows = []
-    for label, shed, noshed in (("fresh bank, load shed", 2500.0, 769.0),
-                                ("fresh bank, nothing shed", 769.0, 769.0),
-                                ("aged bank -30%, nothing shed", 538.0, 538.0)):
+    for label, shed, noshed in (("fresh bank, load shed", 825.0, 254.0),
+                                ("fresh bank, nothing shed", 254.0, 254.0),
+                                ("aged bank -30%, nothing shed", 178.0, 178.0)):
         scn = f"""board autosport
 duration 2500
 trace 1
@@ -963,13 +964,13 @@ trace 1
     # How slow a card still fits inside the *worst-case* window, not the nominal.
     print("\n  Card latency the 538 ms corner tolerates:")
     last_ok = None
-    for flush_ms in (18, 50, 100, 200, 300, 400, 500, 600):
+    for flush_ms in (18, 40, 60, 80, 100, 120, 150, 200):
         scn = f"""board autosport
 duration 2500
 trace 1
 @0 vbat 13.8
 @0 sensorrail 1 5vs
-@0 budget 538 538
+@0 budget 178 178
 @0 sdflush {flush_ms}
 @0 canid 0x316
 @0 canrate 100
@@ -981,8 +982,8 @@ trace 1
         print("    %3d ms flush -> %s" % (flush_ms, "LOST" if lost else "closed"))
         if not lost:
             last_ok = flush_ms
-    check(last_ok is not None and last_ok >= 300,
-          "the worst-case window still swallows a card 15x slower than healthy",
+    check(last_ok is not None and last_ok >= 100,
+          "the worst-case window still swallows a card 5x slower than healthy",
           "safe up to a %s ms flush, against ~18 ms for a healthy card"
           % last_ok)
     return rows
@@ -993,14 +994,13 @@ def study_flush_margin(exes):
     print("  README section 2 says the shed path 'covers even a card that")
     print("  stalls'. This puts a number on that: the flush time is swept until")
     print("  the close no longer fits inside the hold-up window. The sweep runs")
-    print("  out to six seconds because the supercap made the old 300 ms top")
-    print("  end meaningless -- nothing failed, which reads as proof and is")
-    print("  really just a sweep that stopped too early.")
+    print("  out past a second: the supercap bank makes the old 300 ms top")
+    print("  end meaningless, and a sweep where nothing fails reads as proof")
+    print("  when it is really a sweep that stopped too early.")
     print("    %10s %12s %14s" % ("flush time", "outcome", "closed at"))
     last_ok = None
     first_bad = None
-    for flush_ms in (18, 100, 300, 600, 1000, 1500, 2000, 2400, 2600, 3000,
-                     4000, 6000):
+    for flush_ms in (18, 100, 200, 400, 600, 700, 800, 850, 900, 1200):
         scn = f"""board autosport
 duration 2000
 trace 2
@@ -1026,8 +1026,8 @@ trace 2
     # A healthy card flushes in tens of milliseconds. Requiring the window to
     # survive 80 ms means it tolerates a card roughly four times slower than
     # that before the log is lost.
-    check(last_ok is not None and last_ok >= 2000,
-          "the window tolerates a card ~100x slower than a healthy one",
+    check(last_ok is not None and last_ok >= 600,
+          "the window tolerates a card ~35x slower than a healthy one",
           "still safe at a %d ms flush, against ~18 ms healthy" % (last_ok or 0))
     check(first_bad is not None,
           "and a slow enough card still does lose the file",

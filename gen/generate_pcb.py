@@ -280,7 +280,7 @@ ZONES = [
     ("can2",      (66.0, 12.0, 24.0, 30.0), lambda p, n, s: n & {"CAN2_TXD", "CAN2_RXD", "CAN2_INT", "CAN2_SCK", "CAN2_MOSI", "CAN2_MISO", "CAN2_CS", "XTAL1", "XTAL2", "CAN2H_T", "CAN2L_T", "CAN2_H_C", "CAN2_L_C", "CAN2_S", "TERM2_A", "CAN2_SPLIT", "AUX_A", "AUX_B"}),
     ("kline",     (66.0, 43.0, 24.0, 15.0), lambda p, n, s: n & {"K_LINE", "K_TX", "K_RX", "K_TX_G", "K_TX_D", "K_PU"}),
     ("ws2812",    (66.0, 59.0, 24.0,  8.0), lambda p, n, s: n & {"LED_DIN_MCU", "LED_DIN_A", "LED_DIN", "LED_5V"}),
-    ("holdup",    (66.0, 68.0, 24.0, 10.0), lambda p, n, s: n & {"SCAP_TOP", "SCAP_MID"}),
+    ("holdup",    (66.0, 68.0, 24.0, 13.0), lambda p, n, s: n & {"SCAP_TOP", "SCAP_MID"}),
 
     # ---- middle strip: under the dev board, short parts only -------------
     ("pfd",       (42.5, 14.0, 17.9, 12.0), lambda p, n, s: n & {"PFD_SENSE", "PWR_FAIL"}),

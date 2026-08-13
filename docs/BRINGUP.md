@@ -38,7 +38,7 @@ header (`J7`) to test without risking a dev board.
 
 - [ ] 5 V in, current-limited to 200 mA. Inrush settles within a second or
       two, then **~30 mA** and slowly falling as the bank charges. It takes
-      about four minutes to reach full charge through the 100 Ω — that is by
+      about 80 seconds to reach full charge through the 100 Ω — that is by
       design, see `docs/PARTS.md`.
 - [ ] 3.3 V in: **< 5 mA** with nothing else attached.
 - [ ] Green LED on.
@@ -48,7 +48,7 @@ header (`J7`) to test without risking a dev board.
       against the exact part bought — shunt references are not consistent
       between vendors in SOT-23.
 - [ ] Kill the 5 V supply with the bank charged and watch the rail on a
-      scope: it should coast for **seconds**, not milliseconds. Collapsing
+      scope: it should coast for **most of a second**, not milliseconds. Collapsing
       immediately means `D2` is backwards or the cells are open.
 - [ ] Nothing warm after five minutes.
 
@@ -85,9 +85,13 @@ configuration — the aux pins are either/or by design.
 - [ ] Write a file, pull the USB plug mid-write, re-read the card. The file
       must be closed and intact. This is the whole point of the hold-up.
 - [ ] Feed a known 5.00 V into a channel: the ADS1115 should read
-      **0.836 V** differentially (0–16 V divider, 2.21/13.21).
+      **0.833 V** differentially (0–16 V divider, 2.2/13.2 = exactly 1/6).
+      The dividers are 1 %, so expect up to about 1.4 % off nominal and
+      record the number -- that is the channel's calibration constant,
+      and taking it is what the 1 % parts assume you will do.
 - [ ] Short `SENS_RTN` to a deliberate 200 mV offset against board ground:
       the reading must **not** move. If it does, the return attenuator does
-      not match the channel — check that both use the same 0.1 % values.
+      not match the channel — check that both legs use the same values from
+      the same reel.
 - [ ] Battery sense with 13.8 V on the harness: **1.045 V** at the pin,
       13.8 V after the firmware's 13.195 divisor.

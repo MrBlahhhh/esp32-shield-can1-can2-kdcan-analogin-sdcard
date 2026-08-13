@@ -66,8 +66,8 @@ CLAIMS = {
     "J4": "DevKit J3",        # socket, right row
     "J8": "microSD",          # card slot
     "J9": "Sensor harness",   # analog loom
-    "C6": "1F",               # hold-up cell
-    "C7": "1F",               # hold-up cell
+    "C6": "0.33F",            # hold-up cell
+    "C7": "0.33F",            # hold-up cell
     "PF1": "0.2A",            # OBD 12 V protection
     "PF2": "0.2A",            # sensor rail
     "PF3": "0.5A",            # shift-light tap

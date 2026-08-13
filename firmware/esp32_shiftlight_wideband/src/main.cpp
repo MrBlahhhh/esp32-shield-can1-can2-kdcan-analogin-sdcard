@@ -12,22 +12,24 @@
 //      The map is grouped by which side of the carrier each circuit sits on,
 //      because the two 22-way sockets slot every plane layer: analog, CAN and
 //      the SD bus all hang off the J1 row, K-line and I2C off the J3 row.
-//   2. The wideband divider is 15k/26k, not 10k/10k. DIVIDER_GAIN was 2.0 and
-//      is now 1.7334 — the original constant reads 17 % high here, and the
-//      firmware's own 5.5 V clamp then hides the top of the range.
+//   2. The wideband divider is 2.2k/13.2k, not 10k/10k. DIVIDER_GAIN was 2.0
+//      and is now 6.0 — the original constant reads the sensor low by a
+//      factor of three here, and there is only one range to get wrong.
 //   3. The +5 V sensor excitation is permanently on, fed from USB through a
 //      polyfuse. The parent board switched it so firmware could shed 80 mA
 //      and stretch a 127 ms ride-through; the supercap bank here holds
 //      seconds, so the switch and its GPIO went away.
 //   4. WS2812 data goes through a 74AHCT1G125 whose input floats from reset,
 //      so GPIO48 is driven low before the LED driver ever touches it.
-//   5. There is a power-fail signal and roughly 2.5 s of supercap behind it,
+//   5. There is a power-fail signal and roughly 825 ms of supercap behind it,
 //      and a microSD card that will be left corrupt if that window is not
 //      spent. README section 2 states the contract; shutdown() honours it.
 //      The signal now watches the 5 V USB rail, not a 12 V harness.
-//   6. K-line (ISO 9141 / KWP2000) is wired to GPIO41/42 through a discrete
+//   6. K-line (ISO 9141 / KWP2000) is wired to GPIO1/2 through a discrete
 //      low-side FET and a divider. TX is inverted in hardware, so the UART
 //      needs UART_SIGNAL_TXD_INV. Nothing in this sketch drives it yet.
+//   7. A second CAN bus hangs off an MCP2518FD on SPI, because the S3 has
+//      exactly one TWAI. Not driven here yet either.
 //
 // GATT is unchanged, so the existing WidebandBleManager in the logger app
 // pairs with this board without modification.
@@ -102,25 +104,26 @@ unsigned long canFrames = 0;      // frames since the last status line
 
 // --- Analog front end (README section 3) ------------------------------------
 //
-// The four channels are identical and jumper-selected. AIN1 carries the
-// wideband, and the gain below MUST match the jumper actually fitted:
+// The four channels are identical and there is ONE range, 0-16 V, which spans
+// a 5 V and a 12 V sensor both. The range and bypass jumpers are gone: a
+// per-channel range select would have needed a per-channel matched return
+// attenuator for the differential ground correction, and a jumper you can
+// half-set is a silent wrong reading.
 //
-//   RANGE open, BYPASS closed   0–3.3 V   ratio 1.0000   gain 1.0000
-//   RANGE A,    BYPASS open     0–5.0 V   ratio 0.5769   gain 1.7334  <- default
-//   RANGE B,    BYPASS open     0–16 V    ratio 0.1673   gain 5.9773
+// AIN1 carries the wideband. gen/simulate_firmware.py study 3 measures the
+// gain end to end, and the mutation harness puts the R53 board's 2.0 back to
+// prove the study would notice.
+// 13.2 / 2.2, which is exactly 6. One divider ratio on this board, spanning
+// 0-16 V, so a 5 V sensor lands at 0.833 V and a 12 V one at 2.00 V. The
+// 0-5 V range and its 1.7334 went with the range-select jumpers -- see the
+// note above the channel loop in gen/generate_schematic.py for why one fixed
+// ratio is what makes the differential ground correction exact.
 //
-// The RANGE jumper now ships BRIDGED 1-2 (0–5 V), so this constant matches a
-// board straight out of the box. Change it only if you cut that bridge.
-//
-// This is the constant that was wrong on the first port: 2.0 is the reciprocal
-// of the R53 board's 10k/10k, and using it here reads 17 % high all the way up
-// the range. gen/simulate_firmware.py study 3 measures it end to end.
-// 13.21 / 2.21. One divider ratio on this board now, spanning 0-16 V, so a
-// 5 V sensor lands at 0.836 V and a 12 V one at 2.01 V. The 0-5 V range and
-// its 1.7334 went with the range-select jumpers -- see the note above the
-// channel loop in gen/generate_schematic.py for why one fixed ratio is what
-// makes the differential ground correction exact.
-static const float DIVIDER_GAIN = 5.9774f;
+// THIS IS A NOMINAL VALUE AND THE DIVIDER IS 1% NOW. Absolute scale wants a
+// per-channel calibration constant measured against a known voltage; the
+// resistors were dropped from 0.1% to 1% precisely because calibration does
+// that job better and cheaper (docs/COST.md).
+static const float DIVIDER_GAIN = 6.0000f;
 static const int   ESP_ADC_PIN  = 4;       // AIN1 = GPIO4 = ADC1_CH3
 static const int   VBAT_ADC_PIN = 8;       // VBAT_SNS = GPIO8, from OBD-II pin 16
 // 108.2k / 8.2k, not the 11.0 this file inherited. The schematic moved to
@@ -130,9 +133,9 @@ static const int   VBAT_ADC_PIN = 8;       // VBAT_SNS = GPIO8, from OBD-II pin 
 // with each other and neither agreed with the board.
 static const float VBAT_DIVIDER = 13.195f;
 
-// I2C is on the Qwiic header, not the pins the R53 board used — GPIO7 and
-// GPIO8 are the microSD supply enable and card detect here.
-// IO38 is the DevKitC-1 v1.1 onboard RGB LED; SDA lives on IO47 here.
+// I2C is on the Qwiic header and on the J1 socket row, beside the analog
+// front end and both ADS1115s. IO38 would have been the obvious SDA but it
+// drives the DevKitC-1 v1.1's own RGB LED.
 static const int   ADS_SDA_PIN  = 10;
 static const int   ADS_SCL_PIN  =  9;
 static const uint8_t ADS_ADDR   = 0x48;

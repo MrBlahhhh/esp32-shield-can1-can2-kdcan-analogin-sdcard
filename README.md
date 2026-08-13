@@ -17,8 +17,9 @@ brings everything that has to touch a car.
   signal channels', so chassis offset subtracts out exactly instead of
   landing on every reading.
 - **The card survives ignition-off.** A supercapacitor bank holds the 5 V
-  rail for about 2.5 seconds after the supply goes away — long enough to
-  finish the block in flight and close the file, with a lot to spare.
+  rail for about 825 ms after the supply goes away — six times what the board
+  this forked from shipped with, and long enough to finish the block in
+  flight and close the file.
 - **The Python in `gen/` is the source.** It generates, places, routes,
   audits and circuit-simulates the whole board; the KiCad files are build
   outputs. `python gen/build_board.py` rebuilds the PCB from nothing.
@@ -40,9 +41,9 @@ reflow, and a second CAN bus and a K-line the parent never had.
 | | |
 |---|---|
 | Board | 98 × 100 mm, 4 layer |
-| Parts | 153 component instances, 71 distinct BOM lines |
+| Parts | 153 component instances, 69 distinct BOM lines |
 | Nets | 90 |
-| Assembly | 128 surface-mount designators across 49 fab BOM lines |
+| Assembly | 128 surface-mount designators across 47 fab BOM lines |
 
 ## What's on it
 
@@ -51,9 +52,9 @@ reflow, and a second CAN bus and a K-line the parent never had.
 | **CAN 1** | TJA1051T/3 on the ESP32's TWAI. Common-mode choke, split termination (off by default), bidirectional clamps. |
 | **CAN 2** | MCP2518FD (SOIC-14) on SPI with a 40 MHz crystal, its own TJA1051, choke, termination and clamps. |
 | **K-line** | Discrete: 2N7002 low-side driver, clamped 22k/10k receiver, optional ISO 9141 tester pull-up on a jumper. |
-| **Analog** | 4 channels, fixed 0–16 V divider (0.1 % thin film), pull-up jumper per channel for 2-wire senders, two ADS1115s, shared Kelvin ground return. |
+| **Analog** | 4 channels, fixed 0–16 V divider (1 %, calibrated in firmware), pull-up jumper per channel for 2-wire senders, two ADS1115s, shared Kelvin ground return. |
 | **microSD** | 1-bit SDMMC, switched card supply, ESD arrays on every contact. |
-| **Hold-up** | 2 × 1 F 2.7 V supercaps in series on the 5 V rail, TLV431 power-fail detector tripping at 4.20 V. |
+| **Hold-up** | 2 × 0.33 F 2.7 V supercaps in series on the 5 V rail, TLV431 power-fail detector tripping at 4.20 V. |
 | **Shift light** | 74AHCT1G125 buffer so WS2812 DIN is a real 5 V, fused tap, 3-pin header. |
 
 There is **no power conversion**. Both rails come up from the dev board's
@@ -91,7 +92,7 @@ python gen/export_fab.py      # gerbers, positions, JLC BOM
 python gen/export_order.py    # LCSC shopping list + what to buy elsewhere
 ```
 
-Every one of the 49 fab BOM lines carries an LCSC part number, and each was
+Every one of the 47 fab BOM lines carries an LCSC part number, and each was
 checked against the live catalogue rather than assumed — see
 [`docs/PARTS.md`](docs/PARTS.md) for what that turned up, including three
 part numbers that were confidently wrong and two footprints that would not
@@ -126,8 +127,8 @@ wrong board.
 - **No antenna keepout.** The module is on the dev board now, radiating from
   about 8.5 mm above this laminate. Copper underneath still detunes it, but
   which end of the outline to clear needs the same DXF.
-- **The hold-up timings are calculated, not measured.** 2500 ms shed /
-  769 ms unshed come from `t = C·dV/I`; the ngspice study for the supercap
+- **The hold-up timings are calculated, not measured.** 825 ms shed /
+  254 ms unshed come from `t = C·dV/I`; the ngspice study for the supercap
   bank has not been written, and ESR and the Schottky's drop over
   temperature will both eat into them.
 - **Check the dev board revision.** v1.1 puts the onboard RGB LED on IO38,

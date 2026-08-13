@@ -1,9 +1,13 @@
 # Where the money goes, and what to do about it
 
+> **Status: two of the three changes below are implemented.** Parts went from
+> **$18.29 to $13.87 a board, a 24 % cut.** The microSD swap was dropped after
+> checking it properly -- see "What happened to the socket" at the end.
+
 Prices read from LCSC on 2026-08-13, at the tier a five-board build lands in.
 Everything below is per board.
 
-## Current cost
+## Cost before these changes
 
 | | per board |
 |---|---:|
@@ -81,7 +85,7 @@ are "tens of milliohms". The Eaton HV0810 class is **200 mΩ**. Two in series
 is 400 mΩ, which drops 48 mV at 120 mA — fine, and still inside the "under
 about 1 Ω" requirement, but the note overstated the case.
 
-### 3. Replace the Hirose microSD socket — saves ~$1.06
+### 3. Replace the Hirose microSD socket — NOT DONE, see below
 
 $1.12 against $0.04–0.06 for a generic push-push TF socket. That is 9 % of the
 SMD BOM in one connector.
@@ -123,14 +127,43 @@ channels is a false economy.
 
 ## Summary
 
-| Change | saves | cost |
+| Change | saves | status |
 |---|---:|---|
-| 0.1 % → 1 % resistors | $2.63 | one calibration constant per channel |
-| 1 F → 0.33 F supercaps | ~$2.00 | 825 ms instead of 2500 ms |
-| Generic microSD socket | ~$1.06 | loses card detect, gains a GPIO |
-| **Subtotal** | **~$5.69** | **$18.29 → $12.60, a 31 % cut** |
-| One ADS1115 | $1.32 | channel 4 loses ground correction |
-| **With that too** | **~$7.01** | **$11.28, a 38 % cut** |
+| 0.1 % → 1 % resistors | **$2.62** measured | **done** |
+| 1 F → 0.33 F supercaps | ~$1.80 estimated | **done** |
+| Generic microSD socket | — | **dropped**, see below |
+| **Achieved** | **$4.42** | **$18.29 → $13.87, a 24 % cut** |
+| One ADS1115 | $1.32 | available, costs channel 4's ground correction |
+
+The resistor saving is measured against the regenerated BOM: the SMD side went
+from $13.16 to $10.54. The supercapacitor saving is an estimate, because those
+are bought outside the LCSC catalogue and the price depends on the cell.
+
+## What happened to the socket
+
+The $1.06 saving was real arithmetic against the wrong part. Those $0.04
+sockets are SHOU HAN and XUNPU house parts whose only drawing is a scanned
+PDF with no extractable dimensions, so **the land pattern cannot be verified**
+— and this project's whole standard is that every part is checked before it is
+trusted. Shipping an unverified footprint on five boards to save a dollar is
+not a trade worth making.
+
+The verifiable alternatives are much less attractive than the search results
+suggested:
+
+| Part | LCSC | qty 10 | KiCad footprint | card detect |
+|---|---|---:|---|---|
+| Hirose DM3D-SF (fitted) | `C719027` | $1.12 | yes | yes |
+| Molex 47219-2001 | `C164170` | $0.63 | yes | no, hinged lid |
+| Hirose DM3AT-SF-PEJM5 | `C114218` | $0.96 | yes | yes, push-push |
+
+So the honest saving is **$0.49**, not $1.06, and it costs the card-detect
+signal and swaps a push-pull for a hinged lid. That is 2.7 % of the board to
+lose a feature. Not worth it — the Hirose stays.
+
+Worth noting for a larger run: at volume the $0.04 parts become worth the
+effort of drawing and verifying a footprint from the manufacturer's drawing.
+At five boards it is not.
 
 ## A note on the PCB
 

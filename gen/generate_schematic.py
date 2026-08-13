@@ -500,7 +500,7 @@ GENERIC_LCSC = {
     ("1nF50V", "0805"): "C46653",
     ("1uF16V", "0805"): "C28323",
     ("1uF50V", "0805"): "C28323",
-    ("2.21k0.1%", "0805"): "C865368",
+    ("2.2k", "0805"): "C17520",   # 1%, and 2.2/13.2 is exactly 1/6
     ("2.2nF50V", "0805"): "C28260",
     ("2.49k", "0805"): "C2930178",
     ("20.5k", "0805"): "C2933365",
@@ -713,9 +713,10 @@ C(pw, "100nF 16V", "+3V3", "GND")
 # outlast. Getting 50 ms would take 8000 uF, four cans, and we would be back
 # to the footprint that made the parent board too big to be a shield.
 #
-# A supercapacitor gets there in less area than one of those cans. 0.5 F over
-# the same 0.6 V window at 120 mA is 2.5 SECONDS, which is not a tight budget
-# by any reading of it.
+# A supercapacitor gets there in less area than one of those cans. 0.165 F
+# over the same 0.6 V window at 120 mA is 825 ms -- six times what the parent
+# board shipped with, and still 65 % clear of the worst card stall the
+# firmware studies model.
 #
 # LOW-ESR CELLS, NOT COIN TYPE. This is the part that bites: a 5.5 V coin
 # EDLC has 30-200 ohm of ESR and physically cannot source 120 mA -- the rail
@@ -723,14 +724,19 @@ C(pw, "100nF 16V", "+3V3", "GND")
 # milliohms. Two 2.7 V cells in series, because 5.5 V single-package parts
 # are all coin type.
 for _ in range(2):
-    part(pw, "C", "Device:C_Polarized", "1F 2.7V",
+    part(pw, "C", "Device:C_Polarized", "0.33F 2.7V",
          "Capacitor_THT:CP_Radial_D8.0mm_P3.50mm",
          {"1": "SCAP_MID" if _ else "SCAP_TOP", "2": "GND" if _ else "SCAP_MID"},
          "Eaton HB1030-2R5105-R",
-         "Hold-up cell %d of 2 in series -> 0.5 F at 5.4 V. Anything from "
-         "0.1 F up works; 0.1 F still gives 500 ms. ESR must be under about "
-         "1 ohm -- check it, coin-type EDLCs are 30-200 ohm and will not "
-         "work here" % (_ + 1))
+         "Hold-up cell %d of 2 in series -> 0.165 F at 5.4 V, which is "
+         "825 ms with the strip shed. 1 F was the first pick and bought "
+         "2500 ms that nothing needs: the parent board shipped 127 ms and "
+         "that was judged adequate, a healthy card flushes in 18 ms, and the "
+         "worst stall gen/simulate_firmware.py models is 500 ms. This is "
+         "still six times the parent's margin and it is the most expensive "
+         "line on the board -- see docs/COST.md. ESR must be under about "
+         "1 ohm; cylindrical cells are around 200 mohm, coin-type EDLCs are "
+         "30-200 OHM and will not work here" % (_ + 1))
 # Series cells do not share voltage by themselves -- leakage current differs
 # part to part and the leakier one ends up with less of the total, which
 # means the other one ends up over its 2.7 V rating and dies slowly. 100k
@@ -1313,9 +1319,9 @@ an = sheet("Analog Inputs", "analog.kicad_sch",
 # comes back as a Kelvin sense wire, through an IDENTICAL attenuator, and the
 # ADS1115 subtracts the two:
 #
-#     AINn      = (Vsig + Voff) * 2.21/13.21
-#     AGND_SENSE= (       Voff) * 2.21/13.21
-#     AINn - AGND_SENSE = Vsig * 2.21/13.21   <- Voff gone, exactly
+#     AINn      = (Vsig + Voff) * 2.2/13.2
+#     AGND_SENSE= (       Voff) * 2.2/13.2
+#     AINn - AGND_SENSE = Vsig * 2.2/13.2     <- Voff gone, exactly
 #
 # SENS_RTN is a sense wire and carries ~12 uA; GND on the connector is the
 # excitation return and carries the sensors' 80 mA. They are separate pins on
@@ -1369,23 +1375,32 @@ for n in range(1, 5):
     part(an, "D", "Device:D_TVS", "SMAJ40CA", SMA, {"1": inp, "2": "GND"},
          "Littelfuse SMAJ40CA",
          "Ch%d harness transient clamp (bidirectional, 400W)" % n, lcsc="C223989")
-    R(an, "1k 0.1%", inp, node,
-      note="Ch%d series/fault-current limit; 0.1%% thin film -- it is inside "
-           "the divider chain, so its tolerance is a gain error" % n)
+    R(an, "1k", inp, node,
+      note="Ch%d series/fault-current limit. 1%%, not the 0.1%% thin film this "
+           "started as -- see docs/COST.md. Fifteen 0.1%% parts cost $2.68, "
+           "more than the CAN controller, to tighten a divider whose error "
+           "the ADS1115's own +/-0.30%% gain spec already dominates. Absolute "
+           "scale is a firmware calibration constant either way; what "
+           "tolerance actually buys here is the MATCH between this chain and "
+           "the return attenuator, and at 1%% a 300 mV chassis offset leaves "
+           "6 mV instead of 0.6 mV" % n)
     part(an, "JP", "Jumper:SolderJumper_2_Open", "PULLUP%d" % n, SJ2,
          {"1": "+5VS", "2": "AIN%d_PU" % n},
          note="Close for 2-wire NTC / open-collector sensors. Nothing to do "
               "with the input range -- it is about what kind of sensor is on "
               "the other end, not how many volts it swings")
     R(an, "2.49k", "AIN%d_PU" % n, node, note="Ch%d bias resistor" % n)
-    R(an, "10k 0.1%", node, out,
-      note="Ch%d divider upper leg, 0.1%% thin film for AFR-grade accuracy" % n)
-    R(an, "2.21k 0.1%", out, "GND",
-      note="Ch%d divider lower leg. 2.21/13.21 = 0.1673, so 16.0 V in gives "
-           "2.68 V at the ADC and 5.0 V gives 0.836 V -- both inside the "
-           "3.1 V the ESP32 ADC can actually use. This value must match the "
-           "return attenuator below exactly or the ground correction is "
-           "worse than useless" % n)
+    R(an, "10k", node, out,
+      note="Ch%d divider upper leg" % n)
+    R(an, "2.2k", out, "GND",
+      note="Ch%d divider lower leg. 2.2/13.2 = exactly 1/6, so 16.0 V in "
+           "gives 2.67 V at the ADC and 5.0 V gives 0.833 V -- both inside "
+           "the 3.1 V the ESP32 ADC can actually use, and the firmware's "
+           "DIVIDER_GAIN is a round 6.000. 2.2k rather than 2.21k because "
+           "E96 values do not exist in the 1%% jellybean library, and the "
+           "0.37%% it moves the ratio is a calibration constant, not an "
+           "error. This value must match the return attenuator below or the "
+           "ground correction is worse than useless" % n)
     C(an, "470nF 50V", out, "GND",
       note="Ch%d anti-alias. 470nF, not the 100nF this inherited: source "
            "impedance here is (1k+10k)||2.21k = 1.84k, so 100nF puts the "
@@ -1410,12 +1425,13 @@ part(an, "D", "Device:D_TVS", "SMAJ40CA", SMA, {"1": "SENS_RTN", "2": "GND"},
      "Littelfuse SMAJ40CA",
      "Return-sense harness clamp. This wire is as exposed as the signals",
      lcsc="C223989")
-R(an, "1k 0.1%", "SENS_RTN", "AGND_A", note="Matches the channels' 1k series")
-R(an, "10k 0.1%", "AGND_A", "AGND_SENSE", note="Matches the channels' upper leg")
-R(an, "2.21k 0.1%", "AGND_SENSE", "GND",
-  note="Matches the channels' lower leg. Same value, same 0.1%% part, same "
-       "reel if possible -- the whole ground correction is the difference of "
-       "two attenuators, so it is only as good as they match. Also what "
+R(an, "1k", "SENS_RTN", "AGND_A", note="Matches the channels' 1k series")
+R(an, "10k", "AGND_A", "AGND_SENSE", note="Matches the channels' upper leg")
+R(an, "2.2k", "AGND_SENSE", "GND",
+  note="Matches the channels' lower leg. Same value, same part, same reel if "
+       "possible -- the whole ground correction is the difference of two "
+       "attenuators, so it is only as good as they match, and parts from one "
+       "reel match far better than their tolerance band suggests. Also what "
        "holds AGND_SENSE at 0 V when nothing is plugged in, so an absent "
        "loom reads as zero offset rather than as a floating reference")
 C(an, "470nF 50V", "AGND_SENSE", "GND",

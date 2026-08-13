@@ -23,7 +23,7 @@ namespace sim {
 
 static const double R_BYPASS = 1.0000;   // 0-3.3 V, 10k shorted
 static const double R_5V     = 0.5769;   // 0-5 V,  15/26 (s3zero only now)
-static const double R_16V    = 0.1673;   // 0-16 V, 2.21/13.21 -- the only
+static const double R_16V    = 1.0/6.0;  // 0-16 V, 2.2/13.2 -- the only
                                          // ratio on the carrier board
 
 static Board make_s3zero() {
@@ -111,20 +111,20 @@ static Board make_autosport() {
   b.pwr_fail_trip = 4.20;
   b.pwr_fail_hyst = 0.10;
   b.supply_floor = 3.60;         // DevKitC-1 LDO dropout at ~120 mA
-  // Hold-up is a 0.5 F supercapacitor bank (2 x 1 F 2.7 V in series) on the
+  // Hold-up is a 0.165 F supercapacitor bank (2 x 0.33 F 2.7 V in series) on
   // 5 V rail, discharging through a Schottky into the dev board.
   //
   //   t = C * dV / I,  dV = 4.2 (trip) - 3.6 (LDO dropout) = 0.6 V
-  //     shed   120 mA (radio down, LEDs dark)  -> 0.5 * 0.6 / 0.120 = 2500 ms
-  //     noshed 390 mA (radio, LEDs, sensors)   -> 0.5 * 0.6 / 0.390 =  769 ms
+  //     shed   120 mA (radio down, LEDs dark)  -> 0.165 * 0.6 / 0.120 = 825 ms
+  //     noshed 390 mA (radio, LEDs, sensors)   -> 0.165 * 0.6 / 0.390 = 254 ms
   //
   // TODO these two are hand-calculated, unlike the 154.4/74.7 they replace,
   // which came out of gen/simulate.py study 4. The equivalent ngspice study
   // for the supercap bank has not been written yet, so treat them as an
   // estimate rather than a measurement -- an ESR term and the Schottky's
   // forward drop over temperature will both eat into them.
-  b.ridethru_shed_ms = 2500.0;
-  b.ridethru_noshed_ms = 769.0;
+  b.ridethru_shed_ms = 825.0;
+  b.ridethru_noshed_ms = 254.0;
   return b;
 }
 
@@ -1180,7 +1180,7 @@ void apply_event(const std::vector<std::string>& a) {
   else if (c == "gndoffset") S().gnd_offset_v = num(a, 1, 0.0);
   else if (c == "sdstall") sd_set_stalled(num(a, 1, 1) != 0);
   else if (c == "sdflush") sd_set_flush_ms(num(a, 1, 18));
-  else if (c == "budget") power_set_budget(num(a, 1, 2500), num(a, 2, 769));
+  else if (c == "budget") power_set_budget(num(a, 1, 825), num(a, 2, 254));
   else if (c == "ble") {
     const std::string& w = a.size() > 1 ? a[1] : std::string();
     if (w == "connect") ble_event_connect();
