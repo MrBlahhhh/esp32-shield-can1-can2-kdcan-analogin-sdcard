@@ -44,6 +44,8 @@ enum Role {
   ROLE_SD_BUS,
   ROLE_PWR_FAIL,
   ROLE_SENS_EN,
+  ROLE_KLINE_TX,      // ISO 9141 K-line, low-side FET gate
+  ROLE_KLINE_RX,      // ISO 9141 K-line, divided and clamped
   ROLE_USB,
   ROLE_UART,
   ROLE_SPI,
@@ -75,10 +77,11 @@ struct Board {
   int    adc_bits;
   bool   ws2812_buffered;    // DIN goes through a 5 V CMOS buffer that floats at boot
   bool   has_pwr_fail;       // board has the TLV431 power-fail detector
-  double pwr_fail_trip;      // volts, falling
+  double pwr_fail_trip;      // volts on the supply rail, falling
   double pwr_fail_hyst;      // volts of hysteresis
-  double ridethru_shed_ms;   // PWR_FAIL -> converter dropout, sensor rail shed
-  double ridethru_noshed_ms; // ... with the sensor rail still loaded
+  double supply_floor;       // volts at which the MCU stops running
+  double ridethru_shed_ms;   // PWR_FAIL -> rail collapse, load shed
+  double ridethru_noshed_ms; // ... with everything still running
 };
 
 const Board* board_by_name(const std::string& name);
@@ -184,10 +187,12 @@ void ble_event_hwmode(uint8_t v);
 // ---------------------------------------------------------------------------
 // Power. The scenario drives the harness voltage; the model derives PWR_FAIL,
 // the ride-through budget and, when the budget runs out, the end of the run.
-void   power_set_vbat(double volts);
+void   power_set_vbat(double volts);       // OBD-II pin 16, sense only
+void   power_set_v5(double volts);         // the rail everything runs on
 // Override the board's ride-through window for one run (scenario: `budget`).
 void   power_set_budget(double shed_ms, double noshed_ms);
 double power_vbat();
+double power_v5();
 bool   power_failed();               // PWR_FAIL asserted
 double power_reserve();              // 1.0 = full cap bank, 0.0 = rails gone
 bool   power_lost();                 // rails have collapsed; stop the run

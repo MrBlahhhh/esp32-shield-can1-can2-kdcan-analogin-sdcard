@@ -281,20 +281,23 @@ def pin_geometry(local_x, local_y, angle, theta):
 # Rails get a power symbol rather than a net-name label. It is what every
 # schematic does, it makes a rail readable at a glance, and it removes the
 # single largest source of labels on the page -- GND alone accounted for
-# hundreds. Where KiCad has no stock symbol for a rail (+VBAT, +5VS, SD_VDD)
+# hundreds. Where KiCad has no stock symbol for a rail (+5VS, SD_VDD,
+# OBD_VBAT)
 # a generic one is instantiated and its Value overridden: for a power symbol
 # KiCad takes the net name from the Value field, so the rail is named
 # correctly and drawn correctly. gen/validate.py re-extracts the netlist
 # through KiCad and compares it node-for-node, so if that were wrong the
 # build would fail rather than quietly merge two rails.
 RAILS = {
-    "GND":    ("power:GND",   "GND"),
-    "+3V3":   ("power:+3V3",  "+3V3"),
-    "+5V":    ("power:+5V",   "+5V"),
-    "VBUS":   ("power:VBUS",  "VBUS"),
-    "+VBAT":  ("power:+BATT", "+VBAT"),
-    "+5VS":   ("power:+BATT", "+5VS"),
-    "SD_VDD": ("power:+BATT", "SD_VDD"),
+    "GND":      ("power:GND",   "GND"),
+    "+3V3":     ("power:+3V3",  "+3V3"),
+    "+5V":      ("power:+5V",   "+5V"),
+    "+5VS":     ("power:+BATT", "+5VS"),
+    # Not a rail the board runs on -- OBD-II pin 16, sense only. It is drawn
+    # as a power symbol anyway because it behaves like one on the sheet:
+    # one source, several consumers, no point wiring it.
+    "OBD_VBAT": ("power:+BATT", "OBD_VBAT"),
+    "SD_VDD":   ("power:+BATT", "SD_VDD"),
 }
 
 
@@ -396,11 +399,14 @@ SMC = "Diode_SMD:D_SMC"
 SMA = "Diode_SMD:D_SMA"
 SOD123 = "Diode_SMD:D_SOD-123"
 LED0805 = "LED_SMD:LED_0805_2012Metric"
-JST4 = "Connector_JST:JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical"
-JST8 = "Connector_JST:JST_PH_B8B-PH-K_1x08_P2.00mm_Vertical"
+JST6 = "Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical"
+JST10 = "Connector_JST:JST_PH_B10B-PH-K_1x10_P2.00mm_Vertical"
 HDR3 = "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
 HDR4 = "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
 HDR6 = "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical"
+# Sockets, not headers: the DevKitC-1 ships with male pins soldered pointing
+# down, so the shield presents receptacles facing up and the dev board drops in.
+SOCK22 = "Connector_PinSocket_2.54mm:PinSocket_1x22_P2.54mm_Vertical"
 HDR8 = "Connector_PinHeader_2.54mm:PinHeader_1x08_P2.54mm_Vertical"
 SOT235 = "Package_TO_SOT_SMD:SOT-23-5"
 SOT233 = "Package_TO_SOT_SMD:SOT-23"   # TLV431 is a 3-pin SOT-23
@@ -459,7 +465,8 @@ def split_value(value):
 #
 # Keyed on the Comment string export_fab.py writes, which is value + voltage +
 # tolerance -- so 100nF100V and 100nF16V stay distinct. That distinction is
-# load-bearing: C2/C5/C16 sit on +VBAT and must be the 100 V part.
+# load-bearing: the OBD 12 V decoupler must be the 100 V part, not the 16 V
+# one that shares its value.
 GENERIC_LCSC = {
     "0466002.NR": "C187595",
     "100": "C17408",
@@ -550,111 +557,150 @@ def flag(sh, net):
 
 # ---------------------------------------------------------------- power ----
 pw = sheet(
-    "Power",
+    "Rails + harness",
     "power.kicad_sch",
-    "Reverse-battery protection, transient clamping, +5V / +3V3 / +5V sensor rails",
+    "USB-derived rails from the dev board, supercap hold-up, OBD-II harness",
 )
 
-part(pw, "J", "Connector_Generic:Conn_01x04", "PWR + CAN harness", JST4,
-     {"1": "VBAT_IN", "2": "GND", "3": "CAN_H", "4": "CAN_L"},
-     "JST B4B-PH-K-S(LF)(SN)", "Pin 1 +12V, 2 GND, 3 CAN_H, 4 CAN_L "
-     "(Autosport Labs harness order)", lcsc="C131334")
-part(pw, "F", "Device:Fuse", "2A slow", "Fuse:Fuse_1206_3216Metric",
-     {"1": "VBAT_IN", "2": "VBAT_F"}, "Littelfuse 0466002.NR",
-     "Sacrificial: only opens on a hard fault, not on reverse polarity")
-part(pw, "FB", "Device:L", "600R", "Inductor_SMD:L_1206_3216Metric",
-     {"1": "VBAT_F", "2": "VBAT_FB"}, "Wurth 742792625", "Conducted-emissions bead")
+# ---------------------------------------------------------------------------
+# There is no power conversion on this board any more.
+#
+# The parent generated its own +5V and +3V3 from the vehicle's 12 V with two
+# LM5164 bucks behind an ideal-diode front end. On a shield that is 57 % of
+# the component area (1746 mm^2 of 3052) for something the dev board already
+# has: the DevKitC-1 takes 5 V from its USB-C socket and makes 3.3 V with its
+# own LDO. So the shield consumes both rails and generates neither.
+#
+# Deleted with the converters: F1, FB1, D1 SMCJ40CA, U1 LM74700, Q1
+# IPD068N10, C3/C6/C7 (the three electrolytic cans), U3/U4 LM5164 and every
+# RON / FB / ripple-injection / bootstrap part around them, L1/L2, the +3V3
+# zener, and the Q2/Q3 sensor-rail load switch.
+#
+# CURRENT BUDGET on the dev board's 5 V pin, which is USB VBUS behind the
+# DevKitC-1's own Schottky:
+#     TJA1051 transmitting dominant        ~50 mA
+#     sensor excitation, 4 x 20 mA          ~80 mA
+#     WS2812 shift light, one lit segment   ~60 mA  (all 8 white is ~480 mA)
+#     dev board with the radio up          ~200 mA
+# A 1.5 A charger covers that with room. All eight LEDs at full white does
+# not -- PF1 below is the backstop, and the shift light only ever lights a
+# few LEDs at a time in practice.
+# ---------------------------------------------------------------------------
 
-# Ideal-diode reverse-battery block
-part(pw, "U", "Power_Management:LM74700", "LM74700-Q1", SOT236,
-     {"1": "VCAP", "2": "GND", "3": "VBAT_UVLO", "4": "+VBAT", "5": "GATE_RB", "6": "VBAT_FB"},
-     "LM74700QDBVRQ1", "Ideal-diode controller; blocks reverse battery via Q1",
-     lcsc="C2941042")
-part(pw, "Q", "Device:Q_NMOS_GSD", "IPD068N10", "Package_TO_SOT_SMD:TO-252-3_TabPin2",
-     {"1": "GATE_RB", "2": "VBAT_FB", "3": "+VBAT"}, "Infineon IPD068N10N3G",
-     "Source to battery, drain to load: body diode blocks reverse polarity. "
-     "The previously specified PSMN4R3-100BSE does not exist", lcsc="C88066")
-C(pw, "1uF 50V", "VCAP", "VBAT_FB", mpn="", note="LM74700 charge-pump reservoir")
-C(pw, "100nF 100V", "VBAT_FB", "GND",
-  note="LM74700 ANODE input capacitor: the datasheet requires a minimum "
-       "22nF at ANODE and this node is behind FB1 with nothing else on it")
-R(pw, "100k", "VBAT_FB", "VBAT_UVLO", note="UVLO upper leg")
-R(pw, "44.2k", "VBAT_UVLO", "GND",
-  note="UVLO lower leg. Ratio 0.3065 against V_EN_IH 1.06/2.0/2.6V gives "
-       "release at 3.5/6.5/8.5V. The earlier 25.5k assumed a 1.2V threshold "
-       "and would not have started until 9.8V typical, 12.8V worst case")
+# OBD-II harness. The parent's 4-way carried +12V/GND/CAN_H/CAN_L because it
+# was also the board's power feed. It is not any more, so the pins it frees
+# go to the two things that need the vehicle side: the K-line and a real
+# battery-voltage reading.
+#
+#   J   OBD-II   what
+#   1   16       battery + (permanent). SENSE ONLY -- see the note below
+#   2   4/5      chassis / signal ground
+#   3   6        CAN_H
+#   4   14       CAN_L
+#   5   7        K-line
+#   6   4/5      ground, second pin so the pair can be twisted with K-line
+part(pw, "J", "Connector_Generic:Conn_01x06", "OBD-II harness", JST6,
+     {"1": "OBD_VBAT", "2": "GND", "3": "CAN_H", "4": "CAN_L",
+      "5": "K_LINE", "6": "GND"},
+     "JST B6B-PH-K-S(LF)(SN)",
+     "OBD-II pins 16/4/6/14/7/5. Pin 1 is sense only -- the board is powered "
+     "from the dev board's USB-C, not from here", lcsc="C157964")
 
-# Ahead of Q1, not behind it. Clamping downstream of the reverse-battery FET
-# leaves Q1 and the LM74700 exposed to whatever arrives on the harness: on a
-# negative transient Q1 turns off and stands the whole pulse across its
-# drain-source, and ISO 7637-2 pulse 1 (-100V) and 3a (-150V) both exceed its
-# 100V rating. In front of the FET the clamp catches those first.
-#
-# Bidirectional, because a unidirectional part here would forward-conduct on
-# a sustained reverse connection and blow the fuse -- which is exactly the
-# outcome the ideal diode exists to avoid. SMCJ40CA stands off 40V either
-# way, so -14V reverse battery is still Q1's job to block, and only real
-# transients are clamped.
-part(pw, "D", "Device:D_TVS", "SMCJ40CA", SMC, {"1": "VBAT_F", "2": "GND"},
-     "Littelfuse SMCJ40CA",
-     "40V standoff / 64.5V clamp @ 1500W, bidirectional: absorbs ISO 7637-2 "
-     "pulse 5b load dump and the negative pulses, ahead of the FET. 40V not "
-     "33V so the part stands off the declared 36V input top", lcsc="C80273")
-C(pw, "100uF 100V", "+VBAT", "GND", fp="Capacitor_SMD:CP_Elec_10x10.5",
-  mpn="Nichicon UCD2A101MNL1GS", polarized=True,
-  note="Bulk hold-up; any 100uF >=80V SMD electrolytic on a 10x10.5 land "
-       "works -- match in the JLC catalog at order. Pin 1 is +")
-C(pw, "10uF 100V", "+VBAT", "GND", fp=C1206, note="Switcher input bypass")
-C(pw, "100nF 100V", "+VBAT", "GND", note="HF bypass")
+# OBD pin 16 is permanent battery, so it is live whenever the harness is
+# plugged in, ignition or not. Nothing on this board is powered from it: it
+# feeds a 100k-topped divider on the analog sheet (VBAT_SNS) and, if stuffed,
+# the optional K-line pull-up. A 100k series resistor into a clamped node is
+# inherently safe -- 36 V gives 0.36 mA and even a 100 V load dump gives 1 mA
+# -- so the divider needs no fuse of its own. The parts below exist for the
+# pull-up option, which is a 510 ohm load and does need protecting.
+part(pw, "F", "Device:Fuse", "0.5A slow", "Fuse:Fuse_1206_3216Metric",
+     {"1": "OBD_VBAT", "2": "OBD_VBAT_F"}, "Littelfuse 0466.500NR",
+     "Protects the optional K-line pull-up only. The battery-sense divider "
+     "is 100k and cannot pass enough current to matter")
+part(pw, "D", "Device:D_TVS", "SMAJ26CA", SMA, {"1": "OBD_VBAT_F", "2": "GND"},
+     "Diodes Inc SMAJ26CA-13-F",
+     "Clamps the OBD 12 V node. 400 W is enough here, not the parent's "
+     "1500 W SMC: nothing downstream draws more than 25 mA, so there is no "
+     "load-dump energy to carry into a converter -- only a clamp to hold",
+     lcsc="C134976")
+C(pw, "100nF 100V", "OBD_VBAT_F", "GND")
 
-# Ride-through bank. The card in this thing is written continuously and the
-# ignition is switched, so every drive ends in an unannounced power cut. With
-# only the 100uF above, +VBAT falls through the converters' UVLO about 12 ms
-# after the harness opens -- less than one SD block write on a slow card, so
-# the file is left however the card happened to leave it.
+# ---- rails in from the dev board -----------------------------------------
+# Both come UP through the sockets on the Dev board sheet, so this sheet only
+# decouples and flags them. Nothing here drives either net; the PWR_FLAGs at
+# the bottom are what stops ERC reporting them as undriven.
+C(pw, "22uF 16V", "+5V", "GND", fp=C1206, note="Bulk at the 5 V socket pin")
+C(pw, "100nF 16V", "+5V", "GND")
+C(pw, "22uF 16V", "+3V3", "GND", fp=C1206, note="Bulk at the 3V3 socket pin")
+C(pw, "100nF 16V", "+3V3", "GND")
+
+# ---- hold-up, so the file still closes -----------------------------------
+# The parent held 760 uF at 12 V and rode out 127 ms with the load shed. The
+# same trick does not work down here and the arithmetic is worth writing
+# down, because it is not obvious:
 #
-# Energy is 0.5*C*(V^2 - Vmin^2), so it belongs here on +VBAT rather than on
-# a 3.3V rail: the same capacitance is worth fifteen times as much at 12 V as
-# it is at 3.3 V. From 12 V (the low end of a healthy battery) down to the
-# 7 V the converters stop regulating at, 760 uF holds 36.1 mJ.
+#   usable window   12.0 -> 7.0 V   (converter dropout)      = 5.0 V
+#   usable window    4.2 -> 3.6 V   (DevKitC-1 LDO dropout)  = 0.6 V
 #
-# 760 uF (100 + 2 x 330), not 540: the 16x22 can has the same land pattern as
-# the 16x17.5 it replaces, so the extra 220 uF is free in copper. It is not
-# free in inrush -- charging the bank through Q1's body diode gives the fuse
-# an I2t burden proportional to C, so the 2 A nano fuse's margin drops from
-# about 5x to about 3.6x. Still comfortable, but it is the number to watch if
-# the bank ever grows again (gen/simulate.py, inrush study).
+# t = C dV / I, so at a 120 mA load 2000 uF of electrolytic buys 12.5 ms --
+# less than one slow SD block write, which is the whole thing this has to
+# outlast. Getting 50 ms would take 8000 uF, four cans, and we would be back
+# to the footprint that made the parent board too big to be a shield.
 #
-# 100 V rated, not 63 V: D1 clamps at 64.5 V and the declared input window
-# already goes to 36 V.
+# A supercapacitor gets there in less area than one of those cans. 0.5 F over
+# the same 0.6 V window at 120 mA is 2.5 SECONDS, which is not a tight budget
+# by any reading of it.
+#
+# LOW-ESR CELLS, NOT COIN TYPE. This is the part that bites: a 5.5 V coin
+# EDLC has 30-200 ohm of ESR and physically cannot source 120 mA -- the rail
+# would collapse the instant it was asked to. Cylindrical cells are tens of
+# milliohms. Two 2.7 V cells in series, because 5.5 V single-package parts
+# are all coin type.
 for _ in range(2):
-    C(pw, "330uF 100V", "+VBAT", "GND",
-      fp="Capacitor_SMD:CP_Elec_16x22", polarized=True,
-      note="Power-fail ride-through. With the sensor rail shed and the LEDs "
-           "off the board draws about 0.35 W here, so the bank holds the "
-           "rails up long enough to finish the block in flight and close the "
-           "file. 16x22 rather than 16x17.5: the two footprints are identical "
-           "in every copper and courtyard layer -- only the can is 4.5 mm "
-           "taller -- so the extra 220 uF costs nothing but enclosure height. "
-           "Any 330uF >=80V on a 16 mm land works; match in the JLC catalogue "
-           "at order. Pin 1 is +")
+    part(pw, "C", "Device:C_Polarized", "1F 2.7V",
+         "Capacitor_THT:CP_Radial_D8.0mm_P3.50mm",
+         {"1": "SCAP_MID" if _ else "SCAP_TOP", "2": "GND" if _ else "SCAP_MID"},
+         "Eaton HB1030-2R5105-R",
+         "Hold-up cell %d of 2 in series -> 0.5 F at 5.4 V. Anything from "
+         "0.1 F up works; 0.1 F still gives 500 ms. ESR must be under about "
+         "1 ohm -- check it, coin-type EDLCs are 30-200 ohm and will not "
+         "work here" % (_ + 1))
+# Series cells do not share voltage by themselves -- leakage current differs
+# part to part and the leakier one ends up with less of the total, which
+# means the other one ends up over its 2.7 V rating and dies slowly. 100k
+# each swamps the leakage and forces a 50/50 split, at 27 uA standing.
+R(pw, "100k", "SCAP_TOP", "SCAP_MID", note="Cell balancing, upper")
+R(pw, "100k", "SCAP_MID", "GND", note="Cell balancing, lower")
+# Charge through the resistor, discharge through the diode. Straight across
+# the rail the bank looks like a dead short at plug-in: 0.5 F is 4 A into a
+# USB port, which trips the charger and may well be read as a fault by it.
+# 22 ohm holds the inrush to 210 mA and charges in about half a minute.
+R(pw, "22", "+5V", "SCAP_TOP", fp="Resistor_SMD:R_1206_3216Metric",
+  note="Inrush limit. 1206 for the pulse rating: 210 mA into 22 ohm is "
+       "1 W for the first instant, decaying with a 11 s time constant")
+part(pw, "D", "Device:D_Schottky", "SS14", SMA, {"1": "SCAP_TOP", "2": "+5V"},
+     "SS14", "Discharge path, bypassing the charge resistor. Anode on the "
+     "bank: it conducts only once the rail has sagged a diode drop below the "
+     "bank, which is exactly when the supply has gone away", lcsc="C2480")
 
 # ---- power-fail detect ---------------------------------------------------
-# Sensed on VBAT_F, ahead of Q1, which is the whole point: when the ignition
-# opens, the harness side collapses at once while +VBAT coasts on the bank
-# above. Q1 is already the isolating diode between them, so this costs no
-# extra parts and gives the earliest possible warning. Sensing +VBAT instead
-# would only notice once the ride-through had already started being spent.
+# Sensed on the 5 V rail itself. The parent could do better -- it sensed
+# ahead of its ideal diode, so it saw the harness open before the bank had
+# given up anything at all -- but there is no equivalent node here: USB VBUS
+# is not brought out on the DevKitC-1, so the rail is the only thing to look
+# at. That is affordable now only because the budget is seconds rather than
+# milliseconds. Losing the first 100 ms of a 2500 ms window costs nothing.
 #
-# A bare divider into a GPIO will not do. The ESP32's input is only
-# guaranteed high above 0.75*VDD and low below 0.25*VDD, so the real trip
-# point could land anywhere from 11 V down to 3.7 V of harness -- and at
-# 3.7 V the bank is long empty. The shunt reference makes it +/-1%.
-R(pw, "100k 1%", "VBAT_F", "PFD_SENSE", note="Power-fail divider, upper leg")
-R(pw, "12.7k 1%", "PFD_SENSE", "GND",
-  note="Lower leg: trips at 1.24V * 112.7/12.7 = 11.00V on the harness, "
-       "below anything a healthy battery does and far above the converters' "
-       "dropout, so there is a whole ride-through between detect and death")
+# A bare divider into a GPIO still will not do, for the same reason as on the
+# parent: the ESP32's input threshold is only specified between 0.25*VDD and
+# 0.75*VDD, which is a 1.7 V window of "could be either". The shunt
+# reference makes the trip point +/-1 %.
+R(pw, "28.7k 1%", "+5V", "PFD_SENSE", note="Power-fail divider, upper leg")
+R(pw, "12.0k 1%", "PFD_SENSE", "GND",
+  note="Lower leg: trips at 1.24V * 40.7/12.0 = 4.20V. The rail sits at "
+       "4.5-4.7V loaded (USB 5 V less the dev board's Schottky and the cable "
+       "drop), and the LDO above holds 3.3 V down to about 3.6 V in, so 4.20 "
+       "is inside the margin at both ends")
 part(pw, "U", "Reference_Voltage:TL431DBZ", "TLV431A", SOT233,
      {"1": "PWR_FAIL", "2": "PFD_SENSE", "3": "GND"},
      "TLV431ASN1T1G",
@@ -669,287 +715,177 @@ part(pw, "U", "Reference_Voltage:TL431DBZ", "TLV431A", SOT233,
      "bench, but it will not be caught by ERC or DRC", lcsc="C127592")
 R(pw, "10k", "+3V3", "PWR_FAIL",
   note="Cathode pull-up. 10k gives the part 330uA, over the TLV431's 100uA "
-       "minimum cathode current. A 2.5V TL431 would need 1mA and so a 2.2k "
-       "here, and the divider below would have to change with it")
+       "minimum cathode current")
 R(pw, "1M", "PWR_FAIL", "PFD_SENSE",
-  note="Hysteresis, about 0.3V at the harness. Without it a battery sagging "
-       "across the threshold on crank would chatter the interrupt")
+  note="Hysteresis, about 0.1 V at the rail. A USB rail is noisier than a "
+       "battery and the trip point is only 300 mV below the working level, "
+       "so this matters more here than it did on the parent")
 C(pw, "1nF 50V", "PFD_SENSE", "GND",
-  note="Just enough to keep switching noise off the reference. Larger would "
-       "delay the very detection this exists to make early")
+  note="Keeps switching noise off the reference")
 
-# ---- switched sensor excitation -----------------------------------------
-# The ride-through only works if the load goes away with the power. LEDs and
-# the SD card are firmware's to shed, but sensors on +5VS are external and
-# draw whatever they draw -- four at 20 mA is 400 mW, which more than doubles
-# the drain and would halve the numbers above. This switch is what makes the
-# shed possible.
-#
-# Off by default: the gate is pulled to +5V through R_g, so the rail comes up
-# only when firmware asserts SENS_EN, and it drops the instant the MCU stops
-# driving. That is the correct failure direction for a rail that feeds a loom.
-part(pw, "Q", "Device:Q_PMOS_GSD", "AO3401A", SOT23,
-     {"1": "SENS_G", "2": "+5V", "3": "VSENS_SW"}, "Alpha & Omega AO3401A",
-     "Sensor-rail load switch. Source to +5V, so the body diode points into "
-     "the rail and the switch blocks with the gate high", lcsc="C15127")
-R(pw, "100k", "+5V", "SENS_G", note="Holds the switch off when nothing drives it")
-part(pw, "Q", "Device:Q_NMOS_GSD", "2N7002", SOT23,
-     {"1": "SENS_EN_G", "2": "GND", "3": "SENS_G"}, "onsemi 2N7002",
-     "Level shifter: the P-FET's gate has to be pulled to GND from 5V, and "
-     "a 3.3V GPIO cannot do that directly", lcsc="C8545")
-R(pw, "10k", "SENS_EN", "SENS_EN_G", note="GPIO series/gate resistor")
-R(pw, "100k", "SENS_EN_G", "GND",
-  note="Holds the level shifter off while the MCU is in reset")
-
-# +5V rail
-part(pw, "U", "Regulator_Switching:LM5164DDA", "LM5164 (5V)", SO8EP,
-     {"1": "GND", "2": "+VBAT", "3": "EN_5V", "4": "RON_5V", "5": "FB_5V",
-      "6": "PG_5V", "7": "BST_5V", "8": "SW_5V", "9": "GND"},
-     "LM5164DDAR", "100V synchronous buck, ultra-low Iq. Non-automotive "
-     "variant; the Q1 is scarce", lcsc="C477928")
-R(pw, "100k", "+VBAT", "EN_5V", note="Enable tied to VIN (LM74700 already gates on UVLO)")
-C(pw, "10nF 100V", "EN_5V", "GND", note="EN sits on a bare 100k to VBAT; this "
-  "keeps a high-impedance enable node quiet in a vehicle")
-R(pw, "31.6k", "RON_5V", "GND",
-  note="RON = 5.0V x 2500 / 400kHz (Eq 12) -> 396kHz; tON = 237ns at the "
-       "53.3V clamp, comfortably above the 50ns minimum")
-C(pw, "2.2nF 50V", "BST_5V", "SW_5V",
-  note="Bootstrap: datasheet mandates exactly 2.2nF X7R -- a larger value "
-       "overstresses the internal VCC regulator and damages the device")
-part(pw, "L", "Device:L", "33uH", "Inductor_SMD:L_Sunlord_SWPA8040S",
-     {"1": "SW_5V", "2": "+5V"}, "Sunlord ASWPA8050S330MT",
-     "Shielded molded, Isat 3A vs the 1.75A max peak limit", lcsc="C340244")
-R(pw, "100k", "+5V", "FB_5V", note="FB upper: 1.2V ref -> 5.00V")
-R(pw, "31.6k", "FB_5V", "GND", note="FB lower")
-# Type-3 ripple injection (datasheet Table 6-1): the all-ceramic output has no
-# ESR ripple for the COT comparator, so a SW-node RC ramp is AC-coupled into
-# FB. Sized for ~20mV at FB with VIN = 14V nominal, per TI's design example.
-R(pw, "121k", "SW_5V", "RAMP_5V", note="Ripple-injection ramp resistor RA")
-C(pw, "2.2nF 50V", "RAMP_5V", "+5V", note="Ramp capacitor CA. 2.2nF, not 3.3nF: at 8 V in the injected ramp was 10.6 mV against the ~15 mV COT floor; the smaller CA buys x1.5")
-C(pw, "270pF 50V", "RAMP_5V", "FB_5V", note="Ramp coupling capacitor CB")
-C(pw, "22uF 16V", "+5V", "GND", fp=C1206)
-C(pw, "22uF 16V", "+5V", "GND", fp=C1206)
-C(pw, "100nF 16V", "+5V", "GND")
-R(pw, "100k", "PG_5V", "+3V3", note="Power-good pull-up")
-
-# +3V3 rail
-part(pw, "U", "Regulator_Switching:LM5164DDA", "LM5164 (3V3)", SO8EP,
-     {"1": "GND", "2": "+VBAT", "3": "EN_3V3", "4": "RON_3V3", "5": "FB_3V3",
-      "6": "PG_3V3", "7": "BST_3V3", "8": "SW_3V3", "9": "GND"},
-     "LM5164DDAR", "Second buck straight off the battery: a shorted 5V "
-     "sensor harness cannot brown out the MCU", lcsc="C477928")
-# This converter's own input capacitors. It had none: it shared the 5 V
-# island's pair, 12.6 mm away across the board, which puts that whole
-# distance in the switching loop. The LM5164 chops the full battery
-# voltage in nanoseconds, and the loop inductance turns into VIN ringing
-# and radiated noise. Two more parts is a cheap fix for it.
-C(pw, "100nF 100V", "+VBAT", "GND",
-  note="3V3 buck HF input bypass -- must sit at U3's VIN pin")
-C(pw, "10uF 100V", "+VBAT", "GND", fp=C1206,
-  note="3V3 buck bulk input, at the VIN pin")
-R(pw, "100k", "+VBAT", "EN_3V3")
-C(pw, "10nF 100V", "EN_3V3", "GND", note="EN noise immunity, as for the 5V rail")
-R(pw, "20.5k", "RON_3V3", "GND",
-  note="RON = 3.3V x 2500 / 400kHz (Eq 12) -> 402kHz; tON = 154ns at the "
-       "53.3V clamp, above the 50ns minimum")
-C(pw, "2.2nF 50V", "BST_3V3", "SW_3V3",
-  note="Bootstrap: datasheet-mandated 2.2nF X7R, do not increase")
-part(pw, "L", "Device:L", "22uH", "Inductor_SMD:L_Sunlord_SWPA8040S",
-     {"1": "SW_3V3", "2": "+3V3"}, "Sunlord ASWPA8050S220MT",
-     "Same automotive series as L1. C340243 verified against the live JLC "
-     "catalogue 2026-08-12: 22uH, 3A Isat, 8x8mm -- one part number below "
-     "L1's C340244, which is the 33uH of the same series",
-     lcsc="C340243")
-R(pw, "100k", "+3V3", "FB_3V3", note="FB upper: 1.2V ref -> 3.28V")
-R(pw, "57.6k", "FB_3V3", "GND", note="FB lower")
-R(pw, "95.3k", "SW_3V3", "RAMP_3V3", note="Ripple-injection ramp resistor RA")
-C(pw, "2.2nF 50V", "RAMP_3V3", "+3V3", note="Ramp capacitor CA, sized as on the 5 V rail for ramp amplitude at low battery")
-C(pw, "270pF 50V", "RAMP_3V3", "FB_3V3", note="Ramp coupling capacitor CB")
-C(pw, "22uF 16V", "+3V3", "GND", fp=C1206)
-C(pw, "22uF 16V", "+3V3", "GND", fp=C1206)
-C(pw, "100nF 16V", "+3V3", "GND")
-R(pw, "100k", "PG_3V3", "+3V3")
-part(pw, "D", "Device:D_Zener", "3.6V 300mW", "Diode_SMD:D_SOD-323",
-     {"1": "+3V3", "2": "GND"}, "onsemi MM3Z3V6T1G",
-     "Rail clamp: an analog input shorted to battery back-feeds ~1.6mA "
-     "through its BAT54S into +3V3; with the MCU asleep the rail would "
-     "otherwise float above the ESP32's 3.6V absolute maximum", lcsc="C116949")
-
-# 5V sensor excitation, fused separately from the board 5V
+# ---- sensor excitation ---------------------------------------------------
+# No load switch any more. Its job on the parent was to shed 80 mA so the
+# ride-through lasted; with 2.5 s of budget there is nothing to shed, and
+# dropping it frees GPIO16 as well as six parts. The protection stays --
+# these wires run into an engine bay whatever powers them.
 part(pw, "PF", "Device:Polyfuse", "0.2A PTC", "Resistor_SMD:R_1206_3216Metric",
-     {"1": "VSENS_SW", "2": "VSENS_F"}, "Bourns MF-MSMF020",
-     "Resettable: a shorted sensor wire trips this, not the board. Now behind "
-     "the load switch, so a short is also something firmware can clear by "
-     "dropping SENS_EN, rather than waiting for the fuse to cool",
-     lcsc="C719178")
+     {"1": "+5V", "2": "VSENS_F"}, "Bourns MF-MSMF020",
+     "Resettable: a shorted sensor wire trips this, not the dev board's USB "
+     "port", lcsc="C719178")
 part(pw, "FB", "Device:L", "600R", "Inductor_SMD:L_0805_2012Metric",
      {"1": "VSENS_F", "2": "+5VS"}, "Wurth 742792022")
 C(pw, "10uF 16V", "+5VS", "GND", fp=C1206)
-part(pw, "TP", "Connector:TestPoint", "PG_5V", TP, {"1": "PG_5V"})
-part(pw, "TP", "Connector:TestPoint", "PG_3V3", TP, {"1": "PG_3V3"})
 part(pw, "D", "Device:D_Zener", "SMAJ6.0A", SMA, {"1": "+5VS", "2": "GND"},
      "Littelfuse SMAJ6.0A",
      "Clamps harness-injected transients on the sensor 5V. 6.0V standoff, "
-     "not 5.0V: a 5.0V part on a 5.0V rail leaks up to 800uA continuously", lcsc="C223993")
+     "not 5.0V: a 5.0V part on a 5.0V rail leaks up to 800uA continuously",
+     lcsc="C223993")
 
 part(pw, "D", "Device:LED", "green", LED0805, {"1": "PWR_LED_K", "2": "+3V3"},
      lcsc="C2297",  # KT-0805G, 525 nm emerald green, verified 2026-08-13
-     note="The board's only LED: +3V3 is up, so the whole supply chain came "
-          "through -- battery, ideal diode, and both converters")
+     note="Shield 3V3 is up, which means the dev board is in its socket the "
+          "right way round and its LDO is running")
 R(pw, "1k", "PWR_LED_K", "GND")
 
-for net in ["+VBAT", "+5V", "+3V3", "+5VS", "GND"]:
+for net in ["+5V", "+3V3", "+5VS", "OBD_VBAT", "GND"]:
     part(pw, "TP", "Connector:TestPoint", net, TP, {"1": net})
-for net in ["GND", "+VBAT", "VBAT_FB", "+5V", "+3V3", "+5VS", "VBUS", "SD_VDD"]:
+# +5V and +3V3 arrive from the dev board through a connector, and OBD_VBAT
+# from a connector as well. Connector pins are passive as far as ERC is
+# concerned, so without these every rail on the board reads as undriven.
+for net in ["GND", "+5V", "+3V3", "+5VS", "OBD_VBAT", "SD_VDD", "AGND_SENSE"]:
     flag(pw, net)
 for _ in range(4):
     part(pw, "H", "Mechanical:MountingHole", "M3", MH, {})
 
 # ------------------------------------------------------------------ MCU ----
-mc = sheet("MCU", "mcu.kicad_sch", "ESP32-S3-WROOM-1 module, USB-C, boot/reset, break-out")
+mc = sheet("Dev board", "mcu.kicad_sch",
+           "ESP32-S3-DevKitC-1 sockets, I2C/Qwiic, WS2812 buffer, rail break-out")
 
-part(mc, "U", "RF_Module:ESP32-S3-WROOM-1", "ESP32-S3-WROOM-1-N16R8",
-     "RF_Module:ESP32-S3-WROOM-1",
+# ---------------------------------------------------------------------------
+# The MCU is not on this board. An ESP32-S3-DevKitC-1 drops into these two
+# 22-way sockets, which mirror its J1 and J3 headers pin for pin (v1.1 user
+# guide). It carries the same ESP32-S3-WROOM-1 module the parent board had on
+# it, so every GPIO assignment came across unchanged -- see
+# docs/SHIELD-PLAN.md.
+#
+# PIN ASSIGNMENT IS A LAYOUT DECISION HERE, NOT A FREE CHOICE.
+#
+# Each socket is 22 through-holes on a 2.54 mm pitch. At a 1.3 mm pad the
+# inner-layer voids leave about half a millimetre of copper between them, so
+# each row cuts a 53 mm slot through every plane. A signal routed across that
+# slot has no return path underneath it and has to go 100 mm round the end
+# instead -- irrelevant for a card-detect switch, ruinous for a 40 MHz SD bus.
+#
+# So the pins are grouped by which SIDE of the board their circuit lives on:
+#
+#   J1 row, left of the board   analog front end + both ADS1115s (pins 4-7,12)
+#                               power-fail (8), CAN (9-11), microSD bus (15-20)
+#   J3 row, right of the board  K-line (6,7), I2C (9,17), WS2812 (16),
+#                               SD card-detect and supply-enable (8,18)
+#
+# Four nets have to get from one side to the other: SDA, SCL, SD_CD and
+# SD_PWR_EN. All four are DC or 400 kHz, and all four route AROUND the end of
+# the row rather than through it, so nothing crosses a plane slot at all. The
+# SD bus, the CAN pair and the four analog channels each stay on their own
+# side by construction.
+#
+# Two constraints made this land with nothing spare. ADC1 is GPIO1-10 and
+# ADC2 is unusable with the radio up, so the five analog pins must come from
+# there; the SD bus eats IO9/IO10 and IO3 is a strapping pin, which leaves
+# exactly IO4, IO5, IO6, IO7 and IO8 -- all on J1. That in turn pushes
+# SD_CD and SD_PWR_EN onto J3, and they are the right two to exile: a
+# mechanical switch and a load-switch gate.
+#
+# IO1 and IO2 stay free on J3, and they are ADC1, so two more analog channels
+# are possible later without moving anything.
+#
+# POWER: the shield consumes both rails and generates neither. 5 V comes UP
+# from the dev board on J1 pin 21 (its USB VBUS, behind its own Schottky) and
+# 3.3 V comes up on J1 pins 1-2, from its onboard LDO.
+#
+# This reverses the earlier decision to feed 5 V only and leave 3V3 open. That
+# rule existed because the shield had its own +3V3 buck and tying the two
+# would have paralleled two regulators onto one net. The buck is gone, so
+# there is nothing to parallel -- both pins are now inputs to the shield.
+#
+# The sockets are receptacles facing up, because a DevKitC-1 ships with male
+# headers already soldered pointing down. The dev board drops in; nothing has
+# to be soldered to it.
+part(mc, "J", "Connector_Generic:Conn_01x22", "DevKit J1", SOCK22,
      {
-         "1": "GND", "2": "+3V3", "3": "MCU_EN",
-         "4": "AIN3", "5": "AIN4", "6": "VBAT_SNS", "7": "SD_PWR_EN",
-         "8": "PWR_FAIL", "9": "SENS_EN", "10": "CAN_TX", "11": "CAN_RX",
-         "12": "SD_CD", "13": "USB_DM", "14": "USB_DP",
-         "15": "IO3", "16": "IO46",
-         "17": "SD_D3", "18": "SD_D2", "19": "SD_D1", "20": "SD_D0",
-         "21": "SD_CMD", "22": "SD_CLK", "23": "CAN_S",
-         "24": "SPI_CS", "25": "LED_DIN_MCU", "26": "IO45", "27": "MCU_BOOT",
-         "31": "I2C_SDA", "32": "I2C_SCL",
-         "33": "SPI_SCK", "34": "SPI_MISO", "35": "SPI_MOSI",
-         "36": "UART_RX", "37": "UART_TX", "38": "AIN2", "39": "AIN1",
-         # Hidden in the symbol; KiCad bonds them to GND by name.
-         "40": "GND", "41": "GND",
+         "1": "+3V3", "2": "+3V3",   # its LDO output, feeding the shield
+         # --- analog block, top of the row, all five ADC1 pins together ---
+         "4": "AIN1", "5": "AIN2", "6": "AIN3", "7": "AIN4",
+         "8": "PWR_FAIL",
+         # --- CAN block ---
+         "9": "CAN_S", "10": "CAN_TX", "11": "CAN_RX",
+         "12": "VBAT_SNS",           # IO8, the fifth ADC1 pin
+         # 13 (IO3) and 14 (IO46) are strapping pins and stay unconnected.
+         # --- microSD bus, bottom of the row, six contiguous pins ---
+         "15": "SD_D3", "16": "SD_D2", "17": "SD_D1", "18": "SD_D0",
+         "19": "SD_CMD", "20": "SD_CLK",
+         "21": "+5V", "22": "GND",
      },
-     "ESP32-S3-WROOM-1-N16R8", lcsc="C2913202",
-     note="16MB flash / 8MB octal PSRAM. Pins 28-30 (IO35/36/37) are consumed by "
-     "the octal PSRAM and must stay unconnected. IO3/IO45/IO46 on the spare "
-     "header are strapping pins -- leave floating at boot.",
-     nc=("28", "29", "30"))
+     mpn="ESP32-S3-DevKitC-1 J1",
+     note="Mirrors DevKitC-1 J1. Pins 1-2 (3V3) and 21 (5V) are both INPUTS "
+          "to the shield. Analog on 4-7 and 12, CAN on 9-11, SD bus on 15-20 "
+          "-- grouped so each block routes away from the row rather than "
+          "across it. Pin 3 is RST, pins 13/14 are IO3/IO46, all left open.",
+     nc=("3", "13", "14"))
 
-R(mc, "10k", "+3V3", "MCU_EN")
-C(mc, "1uF 16V", "MCU_EN", "GND", note="EN reset delay")
-part(mc, "SW", "Switch:SW_Push", "RESET", "Button_Switch_SMD:SW_SPST_TL3342",
-     {"1": "MCU_EN", "2": "GND"}, "TL3342F160QG",
-     "Genuine E-Switch is scarce at LCSC; any 5.2mm gull-wing tact fits",
-     lcsc="C2886898")
-R(mc, "10k", "+3V3", "MCU_BOOT")
-part(mc, "SW", "Switch:SW_Push", "BOOT", "Button_Switch_SMD:SW_SPST_TL3342",
-     {"1": "MCU_BOOT", "2": "GND"}, "TL3342F160QG", lcsc="C2886898")
+part(mc, "J", "Connector_Generic:Conn_01x22", "DevKit J3", SOCK22,
+     {
+         "1": "GND",
+         # 2, 3 are IO43/IO44, the dev board's own UART0 console -- left to it.
+         # 4, 5 are IO1/IO2. Free, and both ADC1: two more analog channels
+         # are available here without disturbing anything above.
+         # 6, 7, 8 are IO42/IO41/IO40, and 9 is IO39. All four are the
+         # ESP32-S3's EXTERNAL JTAG pins (MTMS/MTDI/MTDO/MTCK), which sounds
+         # worse than it is: the S3 defaults to the USB-Serial-JTAG bridge on
+         # IO19/20 for debugging, so these are ordinary GPIO unless an eFuse
+         # says otherwise.
+         "6": "K_RX", "7": "K_TX",
+         "8": "SD_PWR_EN",           # DC, so crossing sides costs nothing
+         "9": "I2C_SCL",
+         # 10 is IO38, which drives the DevKitC-1 v1.1's onboard addressable
+         # RGB LED -- using it for I2C would flicker the LED on every
+         # transaction and hang its input capacitance on the bus.
+         # 11-13 are IO37/36/35, consumed by the module's octal PSRAM.
+         # 14 is IO0 (BOOT) and 15 is IO45, both the dev board's business.
+         "16": "LED_DIN_MCU",
+         "17": "I2C_SDA",            # IO47, free and not a strapping pin
+         "18": "SD_CD",              # a mechanical switch; DC
+         # 19, 20 are IO20/IO19, wired to the dev board's native USB port.
+         "21": "GND", "22": "GND",
+     },
+     mpn="ESP32-S3-DevKitC-1 J3",
+     note="Mirrors DevKitC-1 J3. K-line on 6/7, I2C on 9/17, WS2812 on 16, "
+          "and the SD card's two DC control lines on 8/18 -- the only nets "
+          "that cross to the other side of the board, and they go round the "
+          "end of the row. Pin 10 (IO38) is left open because it drives the "
+          "dev board's RGB LED on v1.1; check the revision, some put it on "
+          "IO48, which is the WS2812 output here.",
+     nc=("2", "3", "4", "5", "10", "11", "12", "13", "14", "15", "19", "20"))
+
+# Decoupling for the shield's own 3V3 loads. The module's decoupling went with
+# the module; this is what the ADS1115, the analog dividers and the SD
+# pull-ups sit behind.
 C(mc, "10uF 16V", "+3V3", "GND", fp=C1206)
 C(mc, "100nF 16V", "+3V3", "GND")
-C(mc, "100nF 16V", "+3V3", "GND")
 
-part(mc, "J", "Connector:USB_C_Receptacle_USB2.0_16P", "USB-C",
-     "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
-     {"A1": "GND", "B1": "GND", "A12": "GND", "B12": "GND", "S1": "GND",
-      "A4": "VBUS_IN", "B4": "VBUS_IN", "A9": "VBUS_IN", "B9": "VBUS_IN",
-      "A5": "USB_CC1", "B5": "USB_CC2",
-      "A6": "USB_DP_CON", "B6": "USB_DP_CON",
-      "A7": "USB_DM_CON", "B7": "USB_DM_CON"},
-     mpn="HRO TYPE-C-31-M-12", lcsc="C165948",
-     note="Programming / CDC console only -- not a power path in the car",
-     nc=("A8", "B8"))
-R(mc, "5.1k", "USB_CC1", "GND")
-R(mc, "5.1k", "USB_CC2", "GND")
-part(mc, "PF", "Device:Polyfuse", "0.5A hold", "Resistor_SMD:R_1206_3216Metric",
-     {"1": "VBUS_IN", "2": "VBUS_R"}, "Bourns MF-MSMF050", lcsc="C17313")
-
-# ---- USB overvoltage cutoff -----------------------------------------------
-# Simulation showed a 'USB' brick that puts 9 V on VBUS lifting the whole
-# +5V rail to 8.4 V through D5, over the TJA1051's 6 V absolute maximum --
-# the buck can source but not sink, so the rail goes wherever the brick
-# pushes it. A plain 5.1k CC pull-down means a compliant PD source never
-# offers more than 5 V; this guards against the QC bricks and dumb "12 V
-# USB" adapters that do not ask.
-#
-# Same recipe as the sensor-rail switch, with the TLV431 as the brain: the
-# P-FET passes VBUS_R to VBUS by default (gate held low), and above the
-# 1.24 V x 127.4/27.4 = 5.77 V trip the TLV431 conducts, the PNP pulls the
-# gate up to the source, and the switch opens. 5.77 V sits above any
-# compliant 5 V source's 5.25 V ceiling and below the 6 V it protects.
-# With the switch open the P-FET body diode points back at the brick, so
-# nothing leaks through. Off-the-shelf OVP switches were checked first:
-# the TPS25200 class cuts off around 7 V, which is no protection at all
-# for a 6 V limit.
-part(mc, "Q", "Device:Q_PMOS_GSD", "AO3401A", SOT23,
-     {"1": "VBUS_G", "2": "VBUS_R", "3": "VBUS"}, "Alpha & Omega AO3401A",
-     "USB OVP series switch: source faces the connector so the body diode "
-     "blocks toward the board when the switch is open", lcsc="C15127")
-R(mc, "100k", "VBUS_G", "GND", note="Switch on by default")
-part(mc, "Q", "Device:Q_PNP_BEC", "MMBT3906", SOT23,
-     {"1": "VBUS_OV", "2": "VBUS_R", "3": "VBUS_G"}, "ST(Semtech) MMBT3906",
-     "Pulls the P-FET gate to its source on overvoltage. NOTE: this was "
-     "C8544 until 2026-08-12, which is an S9018 -- an NPN, and not this part "
-     "at all. Ordering it would have assembled the wrong polarity into the "
-     "USB over-voltage cutoff and left the protection inoperative. Verified "
-     "against the live catalogue: C84105 is an ST(Semtech) MMBT3906, PNP, "
-     "SOT-23, 40 V", lcsc="C84105")
-R(mc, "10k", "VBUS_R", "VBUS_OV",
-  note="Holds the PNP off while the TLV431 is not conducting")
-part(mc, "U", "Reference_Voltage:TL431DBZ", "TLV431A", SOT233,
-     {"1": "VBUS_OV", "2": "VBUS_OVS", "3": "GND"}, "TLV431ASN1T1G",
-     "OVP comparator; conducts above the divider trip and opens the switch. "
-     "Same pinout caution as the power-fail TLV431: confirm K/REF/A against "
-     "the datasheet of the exact part ordered", lcsc="C127592")
-R(mc, "100k 1%", "VBUS_R", "VBUS_OVS", note="OVP divider upper leg")
-R(mc, "27.4k 1%", "VBUS_OVS", "GND",
-  note="Trip at 1.24V x 127.4/27.4 = 5.77V: above a compliant source's "
-       "5.25V ceiling, below the TJA1051's 6V absolute maximum")
-
-part(mc, "D", "Device:D_Schottky", "40V 1A", SOD123, {"1": "+5V", "2": "VBUS"},
-     "PMEG4010", "OR-ing: bench USB can power the board, but the 5V buck "
-     "(5.00V) reverse-biases it whenever the car is connected", lcsc="C193342")
-C(mc, "10uF 16V", "VBUS", "GND", fp=C1206)
-C(mc, "100nF 16V", "VBUS", "GND",
-  note="USBLC6-2SC6 VBUS pin decoupling; the ST datasheet asks for this "
-       "alongside the bulk part for surge-layout reasons")
-part(mc, "U", "Power_Protection:USBLC6-2SC6", "USBLC6-2SC6", SOT236,
-     {"1": "USB_DP_CON", "2": "GND", "3": "USB_DM_CON",
-      "4": "USB_DM", "5": "VBUS", "6": "USB_DP"},
-     "USBLC6-2SC6", "USB ESD clamp, behind the OVP switch so its own 5.5 V "
-     "VBUS-pin limit is honoured too", lcsc="C7519")
-# The CC pins are the FIRST contacts a plug mates, so they take the cable's
-# static charge before anything else -- and until now they landed on bare
-# 5.1k resistors. Same part as the data-line clamp, one more instance; a
-# fried CC pin is invisible damage that presents as "USB stopped working".
-part(mc, "U", "Power_Protection:USBLC6-2SC6", "USBLC6-2SC6", SOT236,
-     {"1": "USB_CC1", "2": "GND", "3": "USB_CC2", "5": "VBUS"},
-     "USBLC6-2SC6", "CC-pin ESD clamp; flow-through pins 4/6 unused",
-     lcsc="C7519", nc=("4", "6"))
-
-part(mc, "J", "Connector_Generic:Conn_01x04", "UART0", HDR4,
-     {"1": "+3V3", "2": "UART_TX", "3": "UART_RX", "4": "GND"})
 part(mc, "J", "Connector_Generic:Conn_01x04", "I2C / Qwiic", HDR4,
-     {"1": "GND", "2": "+3V3", "3": "I2C_SDA", "4": "I2C_SCL"})
+     {"1": "GND", "2": "+3V3", "3": "I2C_SDA", "4": "I2C_SCL"},
+     note="External I2C sensors. Kept because the dev board has no Qwiic "
+          "connector of its own")
 R(mc, "4.7k", "+3V3", "I2C_SDA")
 R(mc, "4.7k", "+3V3", "I2C_SCL")
 
-
-# SPI breakout for MCP2515 / CC1101 / MAX6675 / etc.
-part(mc, "J", "Connector_Generic:Conn_01x06", "SPI", HDR6,
-     {"1": "+3V3", "2": "GND", "3": "SPI_SCK", "4": "SPI_MISO",
-      "5": "SPI_MOSI", "6": "SPI_CS"},
-     note="IO40 SCK / IO41 MISO / IO42 MOSI / IO47 CS -- GPIO-matrix SPI")
-
 # WS2812 shift-light header: true 5 V data via AHCT buffer (3.3 V TTL-friendly
 # input, 5 V rail). IO48 is RMT-capable and not a strapping pin.
-R(mc, "10k", "SPI_CS", "+3V3",
-  note="Holds an attached slave deselected until firmware drives IO47; the "
-       "module pin's reset-state pull is the unknown")
 R(mc, "33", "LED_DIN_MCU", "LED_DIN_A",
   note="Edge-rate limit into the level shifter")
 part(mc, "U", "74xGxx:74AHCT1G125", "74AHCT1G125", SOT235,
      {"1": "GND", "2": "LED_DIN_A", "3": "GND", "4": "LED_DIN", "5": "+5V"},
-     # NOT C7975 -- that is an LMV324IPWRG4 quad op-amp in TSSOP-14, and out
-     # of stock besides. JLC resolved our part number to it and warned that
-     # the footprint did not match SOT-23-5, which is how the error surfaced.
-     # C7484 verified against the live JLC catalogue 2026-08-12: TI
-     # SN74AHCT1G125DBVR, SOT-23-5, extended.
      "SN74AHCT1G125DBVR", lcsc="C7484",
      note="5 V buffer so WS2812 DIN is a real 5 V rail, not 3.3 V hoping")
 C(mc, "100nF 16V", "+5V", "GND", note="AHCT decoupling")
@@ -964,26 +900,9 @@ part(mc, "J", "Connector_Generic:Conn_01x03", "WS2812", HDR3,
      {"1": "LED_5V", "2": "LED_DIN_J", "3": "GND"},
      note="Shift-light header: +5V / 5V-logic DIN / GND")
 
-# Remaining free GPIOs after SPI + WS2812. All three are strapping pins.
-# IO45 selects VDD_SPI voltage and IO46 the boot mode; both must read low at
-# reset. The internal pull-downs do that on a bare board, but this is a user
-# header -- anything attached that pulls IO45 high sets the flash supply to
-# 1.8V and the module simply will not boot.
-R(mc, "10k", "IO3", "GND", note="Strapping pin held low at boot")
-R(mc, "10k", "IO45", "GND", note="Strapping pin: VDD_SPI = 3.3V")
-R(mc, "10k", "IO46", "GND", note="Strapping pin: normal boot mode")
-part(mc, "J", "Connector_Generic:Conn_01x06", "Spare IO", HDR6,
-     {"1": "IO3", "2": "IO45", "3": "IO46",
-      "4": "PWR_FAIL", "5": "SENS_EN", "6": "GND"},
-     note="IO3/IO45/IO46 are strapping pins, each with a 10k pull-down -- "
-          "anything attached must not fight them at boot. Pins 4 and 5 are "
-          "no longer spare: IO15 is the power-fail interrupt and IO16 is the "
-          "sensor-rail enable. They stay on the header as probe points, so "
-          "the ride-through can be watched on a scope without unsoldering "
-          "anything, but nothing else may drive them. The ground pin is here "
-          "so a probe or a ribbon has a return")
 part(mc, "J", "Connector_Generic:Conn_01x04", "Rail break-out", HDR4,
      {"1": "+5V", "2": "+3V3", "3": "GND", "4": "GND"})
+
 
 # ------------------------------------------------------------- SD card ----
 sd = sheet("SD Card", "sdcard.kicad_sch",
@@ -1048,7 +967,8 @@ for sig in ["CMD", "D0", "D1", "D2", "D3"]:
 R(sd, "47k", "+3V3", "SD_CD", note="Card-detect pull-up")
 
 # ----------------------------------------------------------------- CAN ----
-cn = sheet("CAN", "can.kicad_sch", "Isolated-ground CAN 2.0B node with selectable termination")
+cn = sheet("CAN + K-line", "can.kicad_sch",
+           "CAN 2.0B with selectable termination, plus an ISO 9141 K-line interface")
 
 part(cn, "U", "Interface_CAN_LIN:TJA1051T-3", "TJA1051T/3", SOIC8,
      {"1": "CAN_TX", "2": "GND", "3": "+5V", "4": "CAN_RX", "5": "+3V3",
@@ -1081,15 +1001,128 @@ part(cn, "D", "Device:D_TVS", "SMAJ26CA", SMA, {"1": "CAN_L", "2": "GND"},
 part(cn, "TP", "Connector:TestPoint", "CAN_H", TP, {"1": "CAN_H"})
 part(cn, "TP", "Connector:TestPoint", "CAN_L", TP, {"1": "CAN_L"})
 
+# ------------------------------------------------------------- K-line ----
+# The other half of K+DCAN. On a BMW/MINI cable "D-CAN" is just ISO 15765-4
+# at 500 kbit/s, which the TJA1051 above already does -- bringing OBD-II pins
+# 6 and 14 to the harness is the whole of it. K-line (ISO 9141-2 / KWP2000,
+# OBD-II pin 7) is the part that needs hardware, and it is what an R53
+# actually talks.
+#
+# WHY DISCRETE AND NOT AN L9637D. The L9637D is the textbook part, but it is
+# a 5 V device: its TXD input threshold is 0.7*VCC = 3.5 V, which a 3.3 V
+# GPIO cannot reliably meet, and its RXD output swings to 5 V into a pin
+# rated 3.3 V. Fixing both ends costs more parts than the whole discrete
+# interface below, and the discrete version has no baud ceiling -- a LIN
+# transceiver, the other obvious substitute, slew-limits for 20 kbit/s and
+# would not pass the 115200 baud modes the BMW tools use for flashing.
+#
+# K-line is open-collector at battery level: the ECU holds it high through
+# its own pull-up and either end pulls it down. So TX is a low-side FET and
+# RX is a divider, and the two are independently inverted -- TX is (GPIO high
+# = bus low), RX is not. The ESP32-S3 UART inverts each signal separately in
+# hardware, so uart_set_line_inverse(port, UART_SIGNAL_TXD_INV) is the entire
+# software cost.
+part(cn, "D", "Device:D_TVS", "SMAJ26CA", SMA, {"1": "K_LINE", "2": "GND"},
+     "Diodes Inc SMAJ26CA-13-F",
+     "K-line harness clamp. Same part as the two CAN clamps, so it is one "
+     "BOM line for three positions", lcsc="C134976")
+
+# --- transmit: low-side switch -------------------------------------------
+part(cn, "Q", "Device:Q_NMOS_GSD", "2N7002", SOT23,
+     {"1": "K_TX_G", "2": "GND", "3": "K_TX_D"}, "onsemi 2N7002",
+     "K-line low-side driver. 60 V, so it stands off the clamped transient. "
+     "Drain current in normal use is ~45 mA into the ECU's pull-up",
+     lcsc="C8545")
+R(cn, "10k", "K_TX", "K_TX_G", note="Gate series resistor")
+R(cn, "100k", "K_TX_G", "GND",
+  note="Holds the FET off while the MCU is in reset or the dev board is out "
+       "of its socket. Without it a floating gate can sit the K-line "
+       "permanently dominant, which jams diagnostics for every other tool "
+       "on the bus -- a failure that looks like a dead car, not a dead "
+       "shield")
+R(cn, "33", "K_TX_D", "K_LINE", fp="Resistor_SMD:R_1206_3216Metric",
+  note="Series limit. ISO 9141-2 wants the tester's dominant below 0.2*Vb: "
+       "against the ECU's 510 ohm alone that is 12*33/543 = 0.73 V, and with "
+       "the optional pull-up below also stuffed it is 1.38 V, both inside "
+       "2.4 V. Sized down from 100 ohm for exactly that second case. A "
+       "sustained short of K-line to battery while transmitting puts 364 mA "
+       "through the FET, over its 115 mA continuous rating -- it survives "
+       "the pulse, not the fault. 1206 for the same reason")
+
+# --- receive: divider, clamped -------------------------------------------
+# The ratio cannot avoid clamping and it is worth writing down why. The GPIO
+# needs > 0.75*3V3 = 2.48 V to read high for certain, and the bus recessive
+# level is whatever the battery is doing -- 9 V on crank, 16 V on a charging
+# fault. Satisfying 9*r > 2.48 needs r > 0.276; keeping 16*r under 3.3 needs
+# r < 0.206. There is no ratio that does both, so the divider is sized for
+# the low end and the Schottky pair carries the top.
+R(cn, "22k", "K_LINE", "K_RX", note="RX divider, upper leg")
+R(cn, "10k", "K_RX", "GND",
+  note="Lower leg: 9 V recessive gives 2.81 V, clear of the 2.48 V worst-"
+       "case input-high threshold. Above 11.5 V the clamp takes over and "
+       "the upper leg carries about 0.47 mA at 14 V -- 6 mW, continuous, "
+       "and the reason this is 22k rather than something stiffer")
+part(cn, "D", "Device:D_Schottky_Dual_Series_AKC", "BAT54S", SOT23,
+     {"1": "GND", "3": "K_RX", "2": "+3V3"}, "MDD BAT54S",
+     "RX clamp. This one is not optional -- it conducts on every recessive "
+     "bit above 11.5 V of battery, which is most of them", lcsc="C408389")
+
+# --- optional tester pull-up ---------------------------------------------
+# ISO 9141-2 has the ECU provide the bus pull-up, and it does, so this is
+# unstuffed by default and the board works without it. A few modules are
+# happier seeing a tester pull-up as well; the jumper is here so that is a
+# soldering iron rather than a respin. It hangs off the fused OBD 12 V.
+part(cn, "JP", "Jumper:SolderJumper_2_Open", "KPU (default OFF)", SJ2,
+     {"1": "OBD_VBAT_F", "2": "K_PU"},
+     note="Ships OPEN. Bridge only if a module will not answer without a "
+          "tester pull-up on the K-line")
+R(cn, "510", "K_PU", "K_LINE", fp="Resistor_SMD:R_1206_3216Metric",
+  note="The ISO 9141-2 tester pull-up value. 1206: 12 V across it while the "
+       "line is dominant is 280 mW")
+part(cn, "TP", "Connector:TestPoint", "K_LINE", TP, {"1": "K_LINE"})
+
 # -------------------------------------------------------------- analog ----
 an = sheet("Analog Inputs", "analog.kicad_sch",
-           "4 sensor channels with jumper-selected dividers and pull-up bias")
+           "4 sensor channels, jumper-selected dividers, differential return")
 
-part(an, "J", "Connector_Generic:Conn_01x08", "Sensor harness", JST8,
-     {"1": "+5VS", "2": "AIN1_IN", "3": "AIN2_IN", "4": "AIN3_IN",
-      "5": "AIN4_IN", "6": "GND", "7": "GND", "8": "+5VS"},
-     "JST B8B-PH-K-S(LF)(SN)", "Two 5V and two ground pins so sensors can "
-     "be paired up", lcsc="C157974")
+# ---------------------------------------------------------------------------
+# DIFFERENTIAL GROUND.
+#
+# The parent board was the only thing in the car it was grounded to: harness
+# ground came in on the power connector and everything referenced it. This one
+# is grounded twice over -- through the sensor loom, and through USB, which
+# reaches chassis by way of a charger in a cigarette socket somewhere else
+# entirely. A few hundred millivolts of chassis IR drop between those two
+# points lands directly on every single-ended reading, and it makes the 0.1 %
+# divider resistors below a waste of money: 300 mV on a 0-5 V channel is 6 %.
+#
+# The fix has to be at the DIVIDER, not just at the ADC. A differential ADC
+# fed from a divider whose bottom leg goes to shield ground measures an error
+# that was already baked in one stage earlier. So the sensor's own ground
+# comes back as a Kelvin sense wire, through an IDENTICAL attenuator, and the
+# ADS1115 subtracts the two:
+#
+#     AINn      = (Vsig + Voff) * 15/26
+#     AGND_SENSE= (       Voff) * 15/26
+#     AINn - AGND_SENSE = Vsig * 15/26        <- Voff gone, exactly
+#
+# SENS_RTN is a sense wire and carries ~12 uA; GND on the connector is the
+# excitation return and carries the sensors' 80 mA. They are separate pins on
+# purpose -- if they shared one, that wire's own IR drop would be the offset
+# we are trying to remove.
+#
+# The ESP32's own ADC path stays single-ended. It is the fast-and-rough
+# channel at +/-1-2 % anyway, so a ground offset is not what limits it.
+# ---------------------------------------------------------------------------
+
+part(an, "J", "Connector_Generic:Conn_01x10", "Sensor harness", JST10,
+     {"1": "+5VS", "2": "+5VS", "3": "AIN1_IN", "4": "AIN2_IN",
+      "5": "SENS_RTN", "6": "SENS_RTN", "7": "AIN3_IN", "8": "AIN4_IN",
+      "9": "GND", "10": "GND"},
+     "JST B10B-PH-K-S(LF)(SN)",
+     "Two 5V excitation pins, two Kelvin sense-ground pins, two current-"
+     "carrying grounds, four signals. SENS_RTN must land on the SENSOR's "
+     "ground stud, not on the same stud as pins 9/10", lcsc="C157966")
 
 for n in range(1, 5):
     inp, node, out = "AIN%d_IN" % n, "AIN%d_A" % n, "AIN%d" % n
@@ -1120,7 +1153,10 @@ for n in range(1, 5):
               "automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut "
               "1-2 and leave both open for no divider (then close BYPASS%d "
               "for a raw 0-3.3V sensor). Defaulting to 0-5V also means the "
-              "firmware's DIVIDER_GAIN matches the board as shipped" % n)
+              "firmware's DIVIDER_GAIN matches the board as shipped. NOTE: "
+              "moving a channel off the default breaks the match with the "
+              "return attenuator, so that channel loses its ground rejection "
+              "-- read it single-ended if you do" % n)
     R(an, "15k 0.1%", "AIN%d_R1" % n, "GND",
       note="0-5V range: 5.0V in -> ~2.88V at the ADC (1k series included); "
            "exact scale is a firmware calibration constant")
@@ -1133,29 +1169,80 @@ for n in range(1, 5):
          {"1": "GND", "3": out, "2": "+3V3"}, "MDD BAT54S",
          "Ch%d rail clamp (both polarities)" % n, lcsc="C408389")
 
-# Precision path for the four channels: the ESP32-S3 ADC is only good for
-# ±1-2% even calibrated, which is ±0.2 AFR on a 0-5V wideband output. The
-# ADS1115 (16-bit delta-sigma, on the existing I2C bus at 0x48) shares the
+# ---- the shared return attenuator ----------------------------------------
+# Component-for-component identical to one signal channel's default path:
+# 1k series, 10k upper, 15k lower, same 0.1 % thin film, same 100nF. It has
+# to be, or the subtraction leaves a residue proportional to the mismatch.
+# Same part numbers as the channels above, so they track over temperature.
+part(an, "D", "Device:D_TVS", "SMAJ40CA", SMA, {"1": "SENS_RTN", "2": "GND"},
+     "Littelfuse SMAJ40CA",
+     "Return-sense harness clamp. This wire is as exposed as the signals",
+     lcsc="C223989")
+R(an, "1k 0.1%", "SENS_RTN", "AGND_A", note="Matches the channels' 1k series")
+R(an, "10k 0.1%", "AGND_A", "AGND_SENSE", note="Matches the channels' upper leg")
+R(an, "15k 0.1%", "AGND_SENSE", "GND",
+  note="Matches the channels' 0-5V lower leg. Also what holds AGND_SENSE at "
+       "0 V when nothing is plugged in, so an absent loom reads as zero "
+       "offset rather than as a floating reference")
+C(an, "100nF 16V", "AGND_SENSE", "GND", note="Matches the channels' filter")
+part(an, "D", "Device:D_Schottky_Dual_Series_AKC", "BAT54S", SOT23,
+     {"1": "GND", "3": "AGND_SENSE", "2": "+3V3"}, "MDD BAT54S",
+     "Return-sense rail clamp. +/-0.5 V of chassis offset arrives here as "
+     "+/-0.29 V, inside the ADS1115's GND-0.3V absolute minimum; beyond that "
+     "this is what holds the pin legal", lcsc="C408389")
+
+# ---- precision path ------------------------------------------------------
+# The ESP32-S3 ADC is only good for +/-1-2% even calibrated, which is +/-0.2
+# AFR on a 0-5V wideband output. The ADS1115s (16-bit delta-sigma) share the
 # conditioned AINx nodes, so firmware chooses per channel: fast-and-rough on
-# the internal ADC, or slow-and-accurate here. Inputs are clamped to +3V3 by
-# the BAT54S pairs, within the ADS1115's VDD+0.3V absolute maximum.
-part(an, "U", "Analog_ADC:ADS1115IDGS", "ADS1115",
+# the internal ADC, or slow-and-accurate here.
+#
+# TWO of them, because the differential MUX is the constraint. An ADS1115
+# offers AIN0-AIN1, AIN0-AIN3, AIN1-AIN3, AIN2-AIN3 -- so AIN3 can be a
+# COMMON negative for three channels, but only three. The second part carries
+# the fourth and leaves two differential inputs spare. At about $1.50 and
+# 20 mm^2 that is a great deal cheaper than giving every channel its own
+# return wire and its own matched attenuator, which is 20 more parts.
+part(an, "U", "Analog_ADC:ADS1115IDGS", "ADS1115 (0x48)",
      "Package_SO:VSSOP-10_3x3mm_P0.5mm",
      {"1": "GND", "3": "GND", "4": "AIN1", "5": "AIN2", "6": "AIN3",
-      "7": "AIN4", "8": "+3V3", "9": "I2C_SDA", "10": "I2C_SCL"},
+      "7": "AGND_SENSE", "8": "+3V3", "9": "I2C_SDA", "10": "I2C_SCL"},
      "ADS1115IDGSR", lcsc="C37593",
-     note="16-bit 4-ch I2C ADC for AFR-grade accuracy; ADDR to GND = 0x48",
+     note="Channels 1-3. ADDR to GND = 0x48. Read AIN0-AIN3, AIN1-AIN3 and "
+          "AIN2-AIN3: every one of them is a channel minus the shared "
+          "sensor-ground reference",
      nc=("2",))
-C(an, "100nF 16V", "+3V3", "GND", note="ADS1115 decoupling")
+C(an, "100nF 16V", "+3V3", "GND", note="ADS1115 (0x48) decoupling")
 
-R(an, "100k", "+VBAT", "VBAT_SNS", note="Battery monitor: divide by 11")
+part(an, "U", "Analog_ADC:ADS1115IDGS", "ADS1115 (0x49)",
+     "Package_SO:VSSOP-10_3x3mm_P0.5mm",
+     {"1": "+3V3", "3": "GND", "4": "AIN4", "5": "AIN_SP1", "6": "AIN_SP2",
+      "7": "AGND_SENSE", "8": "+3V3", "9": "I2C_SDA", "10": "I2C_SCL"},
+     "ADS1115IDGSR", lcsc="C37593",
+     note="Channel 4, plus two spare differential inputs on the pads below. "
+          "ADDR to +3V3 = 0x49",
+     nc=("2",))
+C(an, "100nF 16V", "+3V3", "GND", note="ADS1115 (0x49) decoupling")
+part(an, "J", "Connector_Generic:Conn_01x04", "Spare diff in", HDR4,
+     {"1": "AIN_SP1", "2": "AIN_SP2", "3": "AGND_SENSE", "4": "GND"},
+     note="The second ADC's unused pair, brought out raw -- 0-3.3V only, no "
+          "divider and no clamp in front of them. For a bench sensor, not "
+          "for the loom")
+R(an, "100k", "AIN_SP1", "GND", note="Bleed: an open input is not a reading")
+R(an, "100k", "AIN_SP2", "GND")
+
+# ---- battery monitor -----------------------------------------------------
+# OBD-II pin 16, which is permanent battery. It is the only 12 V on the board
+# and it is sense-only: 100k in series means a load dump arrives as 1 mA.
+R(an, "100k", "OBD_VBAT", "VBAT_SNS", note="Battery monitor, upper leg")
 R(an, "8.2k", "VBAT_SNS", "GND",
   note="Divide by 13.2, not 11: at 36V the 11:1 divider put 3.27V on the "
        "pin, above the ADC's usable 3.1V, so the reading saturated near "
        "the top of the declared input window")
 C(an, "100nF 16V", "VBAT_SNS", "GND")
 part(an, "D", "Device:D_Schottky_Dual_Series_AKC", "BAT54S", SOT23,
-     {"1": "GND", "3": "VBAT_SNS", "2": "+3V3"}, "MDD BAT54S", "Battery-monitor clamp", lcsc="C408389")
+     {"1": "GND", "3": "VBAT_SNS", "2": "+3V3"}, "MDD BAT54S",
+     "Battery-monitor clamp", lcsc="C408389")
 
 
 # --------------------------------------------------------------------------
@@ -1260,6 +1347,7 @@ def apply_blocks(libs, sh):
         anchor = match_part(sh, blk["anchor"][0], blk["anchor"][1], taken)
         if anchor is None:
             continue
+        BLOCKS_PLACED.add(id(blk))
         anchor["_block"] = True
         anchor["_own_ext"] = anchor["ext"]
         pin_clearance(libs, anchor)
@@ -1281,6 +1369,31 @@ def apply_blocks(libs, sh):
             owned[part["ref"]] = (anchor, dx, dy)
     sh["_blocks"] = placed
     return owned
+
+
+# Which BLOCKS entries actually got drawn. A block whose sheet was renamed or
+# whose anchor part was deleted used to be skipped in silence, and the only
+# symptom was a schematic that quietly got worse -- five of them had stopped
+# drawing before anyone noticed. The hand-drawn layout is the whole reason
+# this file is 2000 lines, so an orphan is a build failure now.
+BLOCKS_PLACED = set()
+
+
+def check_all_blocks_placed():
+    import sch_blocks
+    names = {sh["name"] for sh in SHEETS}
+    orphans = []
+    for blk in sch_blocks.BLOCKS:
+        if id(blk) in BLOCKS_PLACED:
+            continue
+        why = ("no sheet named %r" % blk["sheet"] if blk["sheet"] not in names
+               else "no unclaimed %r on that sheet" % (blk["anchor"][0],))
+        orphans.append("  %-18s %s" % (blk["anchor"][0], why))
+    if orphans:
+        raise SystemExit(
+            "sch_blocks: %d block(s) were never drawn --\n%s\n"
+            "Either repoint them or take them out of BLOCKS."
+            % (len(orphans), "\n".join(orphans)))
 
 
 def orient_two_pin(libs, p, num, want):
@@ -1966,16 +2079,12 @@ PRO_TEMPLATE = """{
     "net_colors": null,
     "netclass_assignments": null,
     "netclass_patterns": [
-      {"netclass": "Power", "pattern": "+VBAT"},
       {"netclass": "Power", "pattern": "+5V"},
       {"netclass": "Power", "pattern": "+3V3"},
       {"netclass": "Power", "pattern": "GND"},
-      {"netclass": "Power", "pattern": "VBAT_IN"},
-      {"netclass": "Power", "pattern": "VBAT_F"},
-      {"netclass": "Power", "pattern": "VBAT_FB"},
       {"netclass": "Power", "pattern": "+5VS"},
-      {"netclass": "Power", "pattern": "VBUS*"},
-      {"netclass": "Power", "pattern": "SW_*"},
+      {"netclass": "Power", "pattern": "OBD_VBAT*"},
+      {"netclass": "Power", "pattern": "SCAP_*"},
       {"netclass": "Power", "pattern": "SD_VDD"},
       {"netclass": "Power", "pattern": "LED_5V"},
       {"netclass": "Power", "pattern": "VSENS_F"},
@@ -2119,6 +2228,7 @@ def main():
     for i, sh in enumerate(SHEETS):
         open(os.path.join(out, sh["file"]), "w", encoding="utf-8").write(
             emit_sheet(libs, sh, sheet_uuids[sh["file"]], i + 2))
+    check_all_blocks_placed()
     open(os.path.join(out, PROJECT + ".kicad_pro"), "w", encoding="utf-8").write(
         PRO_TEMPLATE % PROJECT)
 

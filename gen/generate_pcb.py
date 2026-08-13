@@ -39,13 +39,48 @@ import generate_schematic as sch  # noqa: E402
 
 # ------------------------------------------------------------------ setup ----
 
-BOARD_W = 84.0
-BOARD_H = 100.0  # 74 -> 80 for the Rev B parts, 80 -> 84 to put the
-                 # sensor-5V block on the same side as what it feeds,
-                 # 84 -> 100 for the power-fail ride-through: two 16 mm
-                 # electrolytic cans plus the detector and the sensor-rail
-                 # switch had no 11 x 11 mm of free board between them.
-                 # 100 mm is still inside JLC's cheap 100 x 100 tier.
+BOARD_W = 90.0
+BOARD_H = 78.0
+# The carrier is organised around the two sockets the dev board drops into,
+# and they dominate everything. Each is 22 through-holes on a 2.54 mm pitch,
+# so each cuts a 53.3 mm slot through every inner layer -- see the socket map
+# in gen/generate_schematic.py for why the pin assignment follows from that.
+#
+# Layout follows the same split. The sockets sit right of centre, and the
+# board is deliberately ASYMMETRIC: the J1 row carries 15 usable pins against
+# J3's 9, so the circuits hanging off it need about twice the room.
+#
+#   left strip    x  2.0 .. 43.0   analog front end, both ADS1115s, CAN,
+#                                  microSD -- everything on the J1 row
+#   middle strip  x 48.5 .. 66.4   under the dev board. Short parts only:
+#                                  about 7 mm of clearance over the socket
+#   right strip   x 71.4 .. 88.0   K-line, WS2812 buffer, OBD harness,
+#                                  supercaps -- the J3 row and the power bits
+#
+# ROW_PITCH IS NOT CONFIRMED. Espressif publish the DevKitC-1's outline only
+# as a DXF and it is not in the HTML user guide. 22.86 mm (0.9 in) is the
+# assumption; if the real part is 25.4 mm the sockets will not accept the
+# board. Get the DXF before ordering -- this one number is the difference
+# between a carrier and a coaster.
+ROW_PITCH = 22.86
+SOCK_X1 = 46.0                 # J2, mirrors the dev board's J1 header
+SOCK_X2 = SOCK_X1 + ROW_PITCH  # J3
+SOCK_Y = 11.0                  # top pin; the row runs 21 * 2.54 = 53.34 down
+DEVKIT_W = 25.5                # dev board body, across the rows
+DEVKIT_L = 63.0                # ... and along them. Also from the DXF, also
+                               # unconfirmed -- see ROW_PITCH above.
+# The DevKitC-1 v1.1 has a USB-C at BOTH ends -- one to the native USB
+# peripheral, one to the UART bridge -- and both have to stay pluggable. The
+# dev board sits about 8.5 mm up on the sockets, so a plug's overmould sweeps
+# the band in front of each end at roughly that height. Anything under ~6 mm
+# tall is fine there; a supercapacitor can or a pin header is not.
+#
+# This caught two parts on the first pass: the second hold-up cell and the
+# spare-input header were both parked in the bottom band, where they would
+# have made one of the two USB ports unusable. Nothing in the netlist or the
+# DRC can see that -- it is a 3D clearance against a part that is not on this
+# board.
+USB_BAND = 12.0                # keep tall parts this far off each dev-board end
 FILLET = 3.0
 OUT = os.path.join(PROJ, "esp32s3-can-sd-logger.kicad_pcb")
 PRO = os.path.join(PROJ, "esp32s3-can-sd-logger.kicad_pro")
@@ -125,105 +160,50 @@ def lib_path(lib):
 # Fixed placements for the structural parts: identified by MPN or value so the
 # mapping survives reference renumbering.  (x, y, rotation_degrees)
 FIXED = {
-    "JST B8B-PH-K-S(LF)(SN)":   (5.0, 18.0, 270),   # sensor harness, left edge
-    "JST B4B-PH-K-S(LF)(SN)":   (5.0, 50.0, 270),   # power/CAN harness
-    "ESP32-S3-WROOM-1-N16R8":   (52.0, 6.8, 0),     # antenna overhangs top edge
-    # The fab outline runs y -3.65..+3.65 and the signal pads sit at y -4.04,
-    # outside it: the contacts leave the REAR of the shell, so at 0 degrees
-    # the mouth faces +y, and the pad row faces the other way.  At 90 the
-    # mouth points out of the right edge and the pads face inboard, which is
-    # where the D+/D- via columns and the USBLC6 already are.
+    # The two sockets the dev board drops into. Everything else on this
+    # board is placed relative to them.
     #
-    # The shell face sits 0.5 mm inside the outline.  It was 2 mm, which is
-    # enough laminate in front of the mouth to stop a plug's overmould
-    # seating; 0.5 mm is as close as the body can go and still be inside the
-    # board for assembly.
-    "HRO TYPE-C-31-M-12":       (79.85, 16.0, 90),  # right edge, opening out
-    "Hirose DM3D-SF":           (75.0, 41.0, 270),  # right edge, card out
-    "value:Spare IO":           (10.0, 3.0, 90),    # top edge, clear of H1
-    "value:SPI":                (27.5, 3.0, 90),    # top edge
-    "value:UART0":              (26.0, 97.5, 90),   # bottom edge
-    "value:I2C / Qwiic":        (41.0, 97.5, 90),
-    "value:Rail break-out":     (56.0, 97.5, 90),
-    # 1.5 mm left of centre in its slot, so H4's keepout ring clears the
-    # connector body by 0.65 mm.
-    "value:WS2812":             (69.0, 97.5, 90),   # shift-light strip
-    "value:RESET":              (78.0, 56.5, 0),    # right edge, case access
-    "value:BOOT":               (78.0, 63.5, 0),
+    # Rotation 0, not 270: PinSocket_1x22 is drawn with its pins already
+    # running down +Y, so a 270 here lays the row ACROSS the board instead of
+    # down it -- 57 mm of socket through the middle of the analog front end,
+    # which is what the fixed-part clash check caught.
+    #
+    # Pin 1 is the anchor, so the row runs from SOCK_Y to SOCK_Y + 53.34.
+    "ESP32-S3-DevKitC-1 J1":    (SOCK_X1, SOCK_Y, 0),
+    "ESP32-S3-DevKitC-1 J3":    (SOCK_X2, SOCK_Y, 0),
+
+    "JST B10B-PH-K-S(LF)(SN)":  (5.0, 5.5, 0),      # sensor harness, top left
+    # Pin 1 is the footprint origin and the pins run +X, so the anchor is the
+    # LEFT end of the body, not its centre. Both of these were placed as if
+    # it were the centre and ended up half off the board.
+    "JST B6B-PH-K-S(LF)(SN)":   (74.0, 5.5, 0),     # OBD harness, top right
+    "Hirose DM3D-SF":           (11.0, 68.0, 0),    # bottom edge, card out
+
+    # Headers on the free edges. The dev board covers the middle of this
+    # board end to end, so nothing can present a connector there.
+    # Rotation 0, not 90: PinHeader_1x0n is drawn with its pins running down
+    # +Y, so these three sit as a column against the right edge at 0. At 90
+    # they lay across it and overhung the board by 8 mm.
+    "value:WS2812":             (86.5, 27.0, 0),
+    "value:Rail break-out":     (86.5, 39.0, 0),
+    "value:I2C / Qwiic":        (86.5, 52.0, 0),
+    "value:Spare diff in":      (30.0, 3.0, 90),
 }
 
-# The two LM5164 buck islands, stacked mid-board left of the SD socket, with
-# tight SW loops and input caps at the VIN pins (geometry from
-# gen/route_bucks.py's original layout).  Parts here are generic values, so
-# they are identified by (sheet, value, exact net set) -- stable no matter how
-# references renumber.  Entries are consumed in schematic order for twins.
-BUCK_FIXED = [
-    # sheet,   value,        nets,                          x,    y,   rot
-    # ---- 5V island: EN/BST/RA row, IC + inductor, input caps at VIN,
-    # ---- RON/FB row, ripple/PG row, output caps at the inductor
-    ("Power", "100k",       {"+VBAT", "EN_5V"},          (38.3, 37.6, 0)),
-    ("Power", "2.2nF 50V",  {"BST_5V", "SW_5V"},         (42.0, 37.6, 0)),
-    ("Power", "121k",       {"SW_5V", "RAMP_5V"},        (45.7, 37.6, 0)),
-    ("Power", "LM5164 (5V)", None,                       (42.5, 42.0, 0)),
-    ("Power", "33uH",    {"SW_5V", "+5V"},            (53.0, 42.0, 0)),
-    ("Power", "100nF 100V", {"+VBAT", "GND"},            (36.3, 42.2, 180)),
-    ("Power", "10uF 100V",  {"+VBAT", "GND"},            (36.2, 45.1, 180)),
-    ("Power", "31.6k",      {"RON_5V", "GND"},           (38.5, 48.2, 0)),
-    ("Power", "31.6k",      {"FB_5V", "GND"},            (42.5, 48.2, 0)),
-    ("Power", "100k",       {"+5V", "FB_5V"},            (46.5, 48.2, 0)),
-    ("Power", "22uF 16V",   {"+5V", "GND"},              (51.5, 47.8, 0)),
-    ("Power", "22uF 16V",   {"+5V", "GND"},              (56.5, 47.8, 0)),
-    ("Power", "100nF 16V",  {"+5V", "GND"},              (56.5, 50.4, 0)),
-    ("Power", "2.2nF 50V",  {"RAMP_5V", "+5V"},          (51.0, 50.8, 0)),
-    ("Power", "270pF 50V",  {"RAMP_5V", "FB_5V"},        (40.5, 51.0, 0)),
-    ("Power", "100k",       {"PG_5V", "+3V3"},           (44.5, 51.0, 0)),
-    ("Power", "10nF 100V",  {"EN_5V", "GND"},            (34.5, 39.9, 0)),
-    ("Power", "+5V",        {"+5V"},                     (33.8, 37.4, 0)),
-
-    # ---- 3V3 island: same pattern, one pitch down
-    # This converter had no input capacitor of its own and reached
-    # across to the 5 V island's pair, 12.6 mm away. Same offsets
-    # from the IC as that island uses.
-    ("Power", "100nF 100V", {"+VBAT", "GND"},            (36.3, 58.0, 180)),
-    ("Power", "10uF 100V",  {"+VBAT", "GND"},            (36.2, 60.9, 180)),
-    ("Power", "100k",       {"+VBAT", "EN_3V3"},         (38.3, 53.4, 0)),
-    ("Power", "2.2nF 50V",  {"BST_3V3", "SW_3V3"},       (42.0, 53.4, 0)),
-    ("Power", "95.3k",      {"SW_3V3", "RAMP_3V3"},      (45.7, 53.4, 0)),
-    ("Power", "LM5164 (3V3)", None,                      (42.5, 57.8, 0)),
-    ("Power", "22uH",    {"SW_3V3", "+3V3"},          (53.0, 57.8, 0)),
-    ("Power", "20.5k",      {"RON_3V3", "GND"},          (38.5, 64.0, 0)),
-    ("Power", "57.6k",      {"FB_3V3", "GND"},           (42.5, 64.0, 0)),
-    ("Power", "100k",       {"+3V3", "FB_3V3"},          (46.5, 64.0, 0)),
-    ("Power", "22uF 16V",   {"+3V3", "GND"},             (51.5, 63.6, 0)),
-    ("Power", "22uF 16V",   {"+3V3", "GND"},             (56.5, 63.6, 0)),
-    ("Power", "100nF 16V",  {"+3V3", "GND"},             (56.5, 66.2, 0)),
-    ("Power", "2.2nF 50V",  {"RAMP_3V3", "+3V3"},        (51.0, 66.6, 0)),
-    ("Power", "270pF 50V",  {"RAMP_3V3", "FB_3V3"},      (40.5, 66.8, 0)),
-    ("Power", "100k",       {"PG_3V3", "+3V3"},          (44.5, 66.8, 0)),
-    ("Power", "10nF 100V",  {"EN_3V3", "GND"},           (34.5, 55.7, 0)),
-    ("Power", "+3V3",       {"+3V3"},                    (33.5, 68.2, 0)),
-]
-
-# Bypass capacitors that have to sit at the pin they bypass rather than
-# wherever the zone packer has room.  These share BUCK_FIXED's machinery --
-# same (sheet, value, net signature) key, same position table -- but they
-# are not part of a buck, so they are listed separately.
-#
-# gen/audit_pcb.py found both of these 8 mm from their supply pin, at the
-# far end of a zone.  A 100 nF that far away is not a bypass: the loop it
-# closes is longer than the one it is supposed to shorten, and for the CAN
-# transceiver that loop is the return path for a 1 Mbit/s driver.
+# The supercapacitors. Two 8 mm cans, the tallest parts on the board by a
+# long way and the only through-hole electrolytics, so they are placed by
+# hand at the right edge rather than let loose on a shelf packer -- and away
+# from the dev board, which sits about 7 mm above the laminate.
 PIN_FIXED = [
-    # sheet, value,        nets,              x,    y,   rot     serves
-    ("MCU", "100nF 16V", {"+5V", "GND"}, (50.8, 84.5, 180)),  # U6 pin 5
-    ("CAN", "100nF 16V", {"+5V", "GND"}, ( 7.6, 37.4, 180)),  # U7 pin 3
-    # The ride-through bank.  Fixed rather than zone-packed because a part
-    # with a 20.8 mm courtyard steamrolls a shelf packer, and split one can
-    # per side because two of them do not fit abreast anywhere: the left one
-    # under the front end that feeds it, the right one under the buttons.
-    ("Power", "330uF 100V", {"+VBAT", "GND"}, (20.5, 83.5, 0)),
-    ("Power", "330uF 100V", {"+VBAT", "GND"}, (72.0, 77.0, 0)),
+    # sheet,             value,   nets,                     x,    y,  rot
+    ("Rails + harness", "1F 2.7V", {"SCAP_TOP", "SCAP_MID"}, (77.0, 60.0, 0)),
+    ("Rails + harness", "1F 2.7V", {"SCAP_MID", "GND"},      (77.0, 70.0, 0)),
 ]
+
+# Nothing left to hand-shape: the two LM5164 islands went with the power
+# section, and gen/route_bucks.py has nothing to route. Kept as an empty
+# table rather than deleted so the placement machinery below is unchanged.
+BUCK_FIXED = []
 
 
 # Mounting holes: one per corner, 4 mm in from each, so the four of them
@@ -232,7 +212,7 @@ PIN_FIXED = [
 # bottom pair 6 mm out of line with the top -- which is neither symmetric
 # nor useful.  4 mm is set by H1: any further in and its keepout ring eats
 # into J7, and the top header row has no slack to give.
-HOLES = [(4.0, 4.0), (4.0, 96.0), (80.0, 4.0), (80.0, 96.0)]
+HOLES = [(4.0, 4.0), (4.0, 74.0), (86.0, 4.0), (86.0, 74.0)]
 
 # How much of a zone's spare height may go between its rows.  Silkscreen
 # reference text is 0.8 mm, so a millimetre on top of the 0.4 mm packing gap
@@ -242,32 +222,41 @@ ROW_SLACK = 1.0
 # Auto-packed zones: (x, y, w, h) shelves filled left-to-right, top-to-bottom.
 # Order matters: the first predicate that matches a part claims it.
 ZONES = [
-    # (name, rect, predicate)
-    ("adc",       (43.0, 29.0,  7.5,  7.0), lambda p, n, s: p["mpn"] == "ADS1115IDGSR" or (s == "Analog Inputs" and n <= {"+3V3", "GND"})),
-    ("ch1",       ( 9.5,  7.0,  8.0, 26.0), lambda p, n, s: n & {"AIN1_A", "AIN1_PU", "AIN1_R1", "AIN1_R2", "AIN1_IN", "AIN1"}),
-    ("ch2",       (18.0,  7.0,  8.0, 26.0), lambda p, n, s: n & {"AIN2_A", "AIN2_PU", "AIN2_R1", "AIN2_R2", "AIN2_IN", "AIN2"}),
-    ("ch3",       (26.5,  7.0,  8.0, 26.0), lambda p, n, s: n & {"AIN3_A", "AIN3_PU", "AIN3_R1", "AIN3_R2", "AIN3_IN", "AIN3"}),
-    ("ch4",       (34.6,  7.0,  7.6, 26.0), lambda p, n, s: n & {"AIN4_A", "AIN4_PU", "AIN4_R1", "AIN4_R2", "AIN4_IN", "AIN4"}),
-    ("ws2812",    (48.5, 85.8, 16.0,  9.6), lambda p, n, s: n & {"LED_DIN_MCU", "LED_DIN_A", "LED_DIN", "LED_5V"} or (s == "MCU" and n == {"+5V", "GND"})),
-    # Ride-through support: the power-fail detector and the sensor-rail
-    # switch, in the band the bottom-edge furniture vacated when the board
-    # grew.  Must be listed before `frontend` and `sens5v`, both of whose
-    # predicates would otherwise claim the divider and the switch.
-    ("ridethru",  (34.5, 69.0, 14.5, 11.0), lambda p, n, s: s == "Power" and bool(n & {"PFD_SENSE", "PWR_FAIL", "SENS_G", "SENS_EN_G"})),
-    ("usb",       (62.0,  8.0, 13.0, 14.0), lambda p, n, s: n & {"USB_DP_CON", "USB_DM_CON", "USB_CC1", "USB_CC2", "VBUS_IN", "VBUS", "USB_DP", "USB_DM"} or (p["prefix"] == "Q" and "VBUS_G" in n)),
-    ("sdpwr",     (59.0, 49.3, 11.0,  8.5), lambda p, n, s: n & {"SD_PG", "SD_EN_G", "SD_PWR_EN"}),
-    ("sdesd",     (63.3, 34.0,  4.3, 14.0), lambda p, n, s: p["value"] == "SRV05-4" or (s == "SD Card" and p["prefix"] == "TP")),
-    ("sd",        (49.8, 21.4, 13.2, 15.0), lambda p, n, s: s == "SD Card"),
-    ("can",       ( 9.5, 34.0, 21.0, 15.2), lambda p, n, s: s == "CAN"),
-    ("sens5v",    (34.5, 81.0, 13.5,  8.0), lambda p, n, s: n & {"VSENS_F", "VSENS_SW", "+5VS"} and s == "Power"),
-    ("frontend",  ( 9.2, 49.7, 24.4, 25.0), lambda p, n, s: s == "Power" and n & {"VBAT_IN", "VBAT_F", "VBAT_FB", "GATE_RB", "VCAP", "VBAT_UVLO", "+VBAT"}),
-    # IO3/IO45/IO46 run from the module's south pad row to J7 at the top
-    # left. Pull-downs parked in the bottom band left R29 needing a run
-    # the length of the board; put them on the path instead.
-    ("strap",     (42.6, 20.8,  6.6,  7.6), lambda p, n, s: n & {"IO3", "IO45", "IO46"}),
-    ("mcu_misc",  (63.0, 24.5, 19.0,  8.9), lambda p, n, s: s == "MCU"),
-    ("pwr_misc",  (47.5, 69.5, 13.0, 13.0), lambda p, n, s: True),
+    # (name, rect, predicate). Shelves filled left-to-right, top-to-bottom;
+    # the first predicate that matches a part claims it.
+
+    # ---- left strip: everything that hangs off the J1 socket row ----------
+    ("harness",   ( 2.0,  2.0, 41.0,  9.0), lambda p, n, s: p["prefix"] == "J" and s == "Analog Inputs"),
+    ("ch1",       ( 2.0, 12.5,  9.8, 30.0), lambda p, n, s: n & {"AIN1_A", "AIN1_PU", "AIN1_R1", "AIN1_R2", "AIN1_IN", "AIN1"}),
+    ("ch2",       (12.2, 12.5,  9.8, 30.0), lambda p, n, s: n & {"AIN2_A", "AIN2_PU", "AIN2_R1", "AIN2_R2", "AIN2_IN", "AIN2"}),
+    ("ch3",       (22.4, 12.5,  9.8, 30.0), lambda p, n, s: n & {"AIN3_A", "AIN3_PU", "AIN3_R1", "AIN3_R2", "AIN3_IN", "AIN3"}),
+    ("ch4",       (32.6, 12.5,  9.8, 30.0), lambda p, n, s: n & {"AIN4_A", "AIN4_PU", "AIN4_R1", "AIN4_R2", "AIN4_IN", "AIN4"}),
+    # The return attenuator is a fifth channel in everything but name, and it
+    # only works if it MATCHES the four above -- same values, same package,
+    # same thermal environment. Placed beside them for that reason.
+    ("agnd",      ( 2.0, 43.0, 16.0,  8.0), lambda p, n, s: n & {"SENS_RTN", "AGND_A", "AGND_SENSE"}),
+    ("adc",       (18.5, 43.0, 24.5,  8.0), lambda p, n, s: p["mpn"] == "ADS1115IDGSR" or n & {"AIN_SP1", "AIN_SP2"} or (s == "Analog Inputs" and n <= {"+3V3", "GND"})),
+    ("vbatsns",   ( 2.0, 52.0,  8.0,  7.0), lambda p, n, s: "VBAT_SNS" in n),
+    ("can",       (10.5, 52.0, 32.5, 10.0), lambda p, n, s: s == "CAN + K-line" and not (n & {"K_LINE", "K_TX", "K_RX", "K_TX_G", "K_TX_D", "K_PU"})),
+    ("sd",        (21.0, 62.0, 34.0, 14.0), lambda p, n, s: s == "SD Card"),
+
+    # ---- right strip: the J3 row, plus the parts with no MCU pin at all ---
+    ("kline",     (71.5, 11.0, 13.0, 21.0), lambda p, n, s: n & {"K_LINE", "K_TX", "K_RX", "K_TX_G", "K_TX_D", "K_PU"}),
+    ("ws2812",    (71.5, 33.0, 13.0,  9.0), lambda p, n, s: n & {"LED_DIN_MCU", "LED_DIN_A", "LED_DIN", "LED_5V"}),
+    # The supercaps are 8 mm cans and the tallest things here by a wide
+    # margin, so they go at the board edge rather than under the dev board.
+    ("holdup",    (71.5, 43.0, 13.0,  9.0), lambda p, n, s: n & {"SCAP_TOP", "SCAP_MID"}),
+
+    # ---- middle strip: under the dev board, short parts only -------------
+    ("pfd",       (48.5, 11.0, 17.9, 12.0), lambda p, n, s: n & {"PFD_SENSE", "PWR_FAIL"}),
+    ("sens5v",    (48.5, 24.0, 17.9, 10.0), lambda p, n, s: n & {"VSENS_F", "+5VS"}),
+    # The Dev board sheet's own parts -- I2C pull-ups and rail decoupling --
+    # used to have a shelf in the right strip. They lost it to the hold-up
+    # cells and moved here, under the dev board, which is where the I2C bus
+    # they pull up actually runs.
+    ("decoup",    (48.5, 35.0, 17.9, 30.0), lambda p, n, s: True),
 ]
+
 
 
 def zone_for(part, sheet_name):
@@ -372,6 +361,56 @@ def main():
         s.SetLayer(pcbnew.Edge_Cuts)
         s.SetWidth(mm(0.1))
         board.Add(s)
+
+    # The DevKitC-1's own outline, on SILKSCREEN rather than the fabrication
+    # layer. Nothing inside it may be taller than about 7 mm, the USB sockets
+    # at each end have to stay reachable, and on the finished board it is the
+    # difference between "why is there empty laminate here" and "that is where
+    # the dev board goes, this way round". Silk costs nothing and it is under
+    # the dev board anyway, so it is only ever read at assembly time.
+    def devkit_outline():
+        w, l = DEVKIT_W, DEVKIT_L
+        cx = (SOCK_X1 + SOCK_X2) / 2.0
+        y0 = SOCK_Y + 21 * 2.54 / 2.0 - l / 2.0
+        for x1, y1, x2, y2 in ((cx - w / 2, y0, cx + w / 2, y0),
+                               (cx + w / 2, y0, cx + w / 2, y0 + l),
+                               (cx + w / 2, y0 + l, cx - w / 2, y0 + l),
+                               (cx - w / 2, y0 + l, cx - w / 2, y0)):
+            sh = pcbnew.PCB_SHAPE(board, pcbnew.SHAPE_T_SEGMENT)
+            sh.SetStart(pt(x1, y1))
+            sh.SetEnd(pt(x2, y2))
+            sh.SetLayer(pcbnew.F_SilkS)
+            sh.SetWidth(mm(0.15))
+            board.Add(sh)
+        t = pcbnew.PCB_TEXT(board)
+        t.SetText("ESP32-S3-DevKitC-1")
+        t.SetPosition(pt(cx, y0 + l / 2.0))
+        t.SetLayer(pcbnew.F_SilkS)
+        t.SetTextSize(pcbnew.VECTOR2I(mm(1.2), mm(1.2)))
+        t.SetTextThickness(mm(0.2))
+        t.SetTextAngle(pcbnew.EDA_ANGLE(90, pcbnew.DEGREES_T))
+        board.Add(t)
+    devkit_outline()
+
+    def usb_bands():
+        """The two keep-low strips in front of the dev board's USB sockets."""
+        cx = (SOCK_X1 + SOCK_X2) / 2.0
+        y0 = SOCK_Y + 21 * 2.54 / 2.0 - DEVKIT_L / 2.0
+        for ya, yb in ((y0 - USB_BAND, y0), (y0 + DEVKIT_L, y0 + DEVKIT_L + USB_BAND)):
+            ya, yb = max(0.0, ya), min(BOARD_H, yb)
+            if yb - ya < 0.5:
+                continue
+            for x1, y1, x2, y2 in ((cx - DEVKIT_W / 2, ya, cx + DEVKIT_W / 2, ya),
+                                   (cx + DEVKIT_W / 2, ya, cx + DEVKIT_W / 2, yb),
+                                   (cx + DEVKIT_W / 2, yb, cx - DEVKIT_W / 2, yb),
+                                   (cx - DEVKIT_W / 2, yb, cx - DEVKIT_W / 2, ya)):
+                sh = pcbnew.PCB_SHAPE(board, pcbnew.SHAPE_T_SEGMENT)
+                sh.SetStart(pt(x1, y1))
+                sh.SetEnd(pt(x2, y2))
+                sh.SetLayer(pcbnew.F_Fab)
+                sh.SetWidth(mm(0.1))
+                board.Add(sh)
+    usb_bands()
 
     f, W, H = FILLET, BOARD_W, BOARD_H
     edge_line(f, 0, W - f, 0)

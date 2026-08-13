@@ -119,7 +119,11 @@ def main():
     os.makedirs(FAB, exist_ok=True)
 
     run([py, os.path.join(HERE, "generate_pcb.py")], "place parts")
-    run([py, os.path.join(HERE, "route_bucks.py")], "buck power loops")
+    # Stage 2 is gone with the two LM5164 islands. The dev board makes both
+    # rails from USB, so there is no switching loop on this board to shape by
+    # hand -- generate_pcb.BUCK_FIXED is empty and route_bucks.py has nothing
+    # to match. Skipped rather than deleted: if a converter ever comes back,
+    # so does the stage.
     run([py, os.path.join(HERE, "finish_routing.py"), "--early"],
         "tie duplicated connector pins")
     run([py, os.path.join(HERE, "stitch_planes.py")], "plane vias")

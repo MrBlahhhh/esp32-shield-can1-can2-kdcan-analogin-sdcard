@@ -155,7 +155,7 @@ MODULE = {
     # cap and reset button, IO0 down and to the left with its pull-up and
     # the boot button. Everything else on this sheet reaches the module by
     # name, which is right: those are signals going elsewhere.
-    "sheet": "MCU",
+    "sheet": "Dev board",
     "anchor": ("ESP32-S3-WROOM-1-N16R8", None),
     "parts": [
         # value      nets                       dx      dy   rot
@@ -198,7 +198,7 @@ WS2812 = {
     # cap on the supply pin, another series resistor on the way out, and the
     # strip's own 5 V through a resettable fuse so a shorted strip does not
     # take the rail down with it.
-    "sheet": "MCU",
+    "sheet": "Dev board",
     "anchor": ("74AHCT1G125", None),
     "parts": [
         # value        nets                             dx      dy   rot
@@ -237,7 +237,7 @@ USB = {
     # array. D- has to cross D+ once on the way: the connector presents them
     # in the opposite order to the protection device, and no arrangement of
     # the two avoids it.
-    "sheet": "MCU",
+    "sheet": "Dev board",
     "anchor": ("USB-C", None),
     "parts": [
         # value          nets                          dx      dy   rot
@@ -355,7 +355,7 @@ CAN = {
     # CANL along the bottom, with the common-mode choke, the transient
     # clamps, the split termination and the test points hanging between them
     # in the order the signal meets them.
-    "sheet": "CAN",
+    "sheet": "CAN + K-line",
     "anchor": ("TJA1051T/3", None),
     "parts": [
         # value                nets                        dx      dy   rot
@@ -455,17 +455,17 @@ SDCARD = {
 
 RIDETHRU = {
     # The power-fail detector, read left to right the way the signal flows:
-    # the harness sense divider drops VBAT_F to the TLV431's REF, the 1nF
+    # the sense divider drops the 5 V rail to the TLV431's REF, the 1nF
     # keeps switching noise off it, and when REF falls below 1.24 V the
     # cathode releases PWR_FAIL to its pull-up -- a rising edge into the
     # MCU. The 1M from PWR_FAIL back into the sense node is the hysteresis
-    # that keeps a battery sagging across the trip from chattering it.
-    "sheet": "Power",
+    # that keeps a rail hovering at the trip from chattering it.
+    "sheet": "Rails + harness",
     "anchor": ("TLV431A", {"PWR_FAIL", "PFD_SENSE", "GND"}),
     "parts": [
         # value    nets                            dx      dy   rot
-        ("100k",  {"VBAT_F", "PFD_SENSE"},      -16.51, -17.78,   0),
-        ("12.7k", {"PFD_SENSE", "GND"},         -16.51,  -5.08,   0),
+        ("28.7k", {"+5V", "PFD_SENSE"},         -16.51, -17.78,   0),
+        ("12.0k", {"PFD_SENSE", "GND"},         -16.51,  -5.08,   0),
         ("1nF",   {"PFD_SENSE", "GND"},          -7.62,  -5.08,   0),
         ("10k",   {"+3V3", "PWR_FAIL"},          10.16,  -6.35,   0),
         ("1M",    {"PWR_FAIL", "PFD_SENSE"},     -3.81,   5.08, 270),
@@ -488,7 +488,7 @@ RIDETHRU = {
     "junctions": [(-16.51, -11.43), (-7.62, -11.43),
                   (10.16, 0.00), (12.70, 0.00)],
     "labels": {
-        "VBAT_F": (-21.59, -24.13, 180),
+        "+5V": (-21.59, -24.13, 180),
         "PFD_SENSE": (-20.32, -2.54, 90),
         "PWR_FAIL": (15.24, 0.00, 0),
     },
@@ -557,7 +557,7 @@ USBOVP = {
     # the trip the TLV431 sinks the PNP's base so the gate is yanked up to
     # the source and the switch opens. Gate pull-down keeps it on in normal
     # life; the 10k keeps the PNP off while the TLV431 is not conducting.
-    "sheet": "MCU",
+    "sheet": "Dev board",
     "anchor": ("TLV431A", {"VBUS_OV", "VBUS_OVS", "GND"}),
     "parts": [
         # value    nets                             dx      dy   rot
@@ -602,7 +602,7 @@ SPAREIO = {
     # The spare-IO header with its strap pull-downs attached, instead of
     # three resistors floating elsewhere on the sheet. The drops cross the
     # lower stubs without junctions -- crossings are not connections.
-    "sheet": "MCU",
+    "sheet": "Dev board",
     "anchor": ("Spare IO", None),
     "parts": [
         # value   nets              dx      dy   rot
@@ -636,7 +636,7 @@ SPAREIO = {
 
 QWIIC = {
     # The Qwiic header with the bus pull-ups it owns drawn on it.
-    "sheet": "MCU",
+    "sheet": "Dev board",
     "anchor": ("I2C / Qwiic", None),
     "parts": [
         # value    nets                    dx      dy   rot
@@ -666,25 +666,23 @@ UTILITY = {
     # None of these need wires -- each pin picks up its net through the
     # label or power symbol the emitter attaches -- the block exists purely
     # so they read as a deliberate group.
-    "sheet": "Power",
-    "anchor": ("PG_5V", {"PG_5V"}),
+    "sheet": "Rails + harness",
+    "anchor": ("+5V", {"+5V"}),
     "parts": [
         # value       nets            dx      dy   rot
-        ("PG_3V3",   {"PG_3V3"},    12.70,   0.00,  0),
-        # (the +VBAT test point already lives at the end of FRONTEND's
-        # bulk rail, where it is actually useful)
-        ("+5V",      {"+5V"},       25.40,   0.00,  0),
-        ("+3V3",     {"+3V3"},      38.10,   0.00,  0),
-        ("+5VS",     {"+5VS"},      50.80,   0.00,  0),
-        ("GND",      {"GND"},       63.50,   0.00,  0),
+        # The PG_5V and PG_3V3 test points went with the two bucks; the
+        # rails they reported no longer exist to report on.
+        ("+3V3",     {"+3V3"},      12.70,   0.00,  0),
+        ("+5VS",     {"+5VS"},      25.40,   0.00,  0),
+        ("OBD_VBAT", {"OBD_VBAT"},  38.10,   0.00,  0),
+        ("GND",      {"GND"},       50.80,   0.00,  0),
         ("PWR_FLAG", {"GND"},        0.00,  25.40,  0),
-        ("PWR_FLAG", {"+VBAT"},     10.16,  25.40,  0),
-        ("PWR_FLAG", {"VBAT_FB"},   20.32,  25.40,  0),
-        ("PWR_FLAG", {"+5V"},       30.48,  25.40,  0),
-        ("PWR_FLAG", {"+3V3"},      40.64,  25.40,  0),
-        ("PWR_FLAG", {"+5VS"},      50.80,  25.40,  0),
-        ("PWR_FLAG", {"VBUS"},      60.96,  25.40,  0),
-        ("PWR_FLAG", {"SD_VDD"},    71.12,  25.40,  0),
+        ("PWR_FLAG", {"+5V"},       10.16,  25.40,  0),
+        ("PWR_FLAG", {"+3V3"},      20.32,  25.40,  0),
+        ("PWR_FLAG", {"+5VS"},      30.48,  25.40,  0),
+        ("PWR_FLAG", {"OBD_VBAT"},  40.64,  25.40,  0),
+        ("PWR_FLAG", {"SD_VDD"},    50.80,  25.40,  0),
+        ("PWR_FLAG", {"AGND_SENSE"}, 60.96, 25.40,  0),
         ("M3",       set(),          0.00,  45.72,  0),
         ("M3",       set(),         10.16,  45.72,  0),
         ("M3",       set(),         20.32,  45.72,  0),
@@ -702,10 +700,20 @@ UTILITY = {
 }
 
 
-BLOCKS = [
-    buck("LM5164 (5V)", "+5V", "SW_5V", "EN_5V", "RON_5V", "FB_5V", "BST_5V", "RAMP_5V",
-         "PG_5V", "33uH", "31.6k", "31.6k", "121k"),
-    buck("LM5164 (3V3)", "+3V3", "SW_3V3", "EN_3V3", "RON_3V3", "FB_3V3", "BST_3V3",
-         "RAMP_3V3", "PG_3V3", "22uH", "20.5k", "57.6k", "95.3k"),
-] + [channel(n) for n in (1, 2, 3, 4)] + [FRONTEND, CAN, SDCARD, USB, MODULE,
-     WS2812, RIDETHRU, SENSW, USBOVP, SPAREIO, QWIIC, UTILITY]
+BLOCKS = ([channel(n) for n in (1, 2, 3, 4)]
+          + [CAN, SDCARD, WS2812, RIDETHRU, QWIIC, UTILITY])
+# Gone, with the parts they drew:
+#
+#   buck x2, FRONTEND, SENSW   the whole 12 V power section. The dev board
+#                              makes both rails from USB, so there is no
+#                              converter, no ideal diode and no sensor-rail
+#                              switch left to draw.
+#   USB, MODULE, USBOVP,       the MCU and its surroundings. The dev board
+#   SPAREIO                    brings its own USB, reset and boot buttons,
+#                              and exposes every spare GPIO on the same
+#                              headers this shield plugs into.
+#
+# Their layout tables are left in the file rather than deleted -- if this
+# ever grows back into a standalone board, they are the drawing that goes
+# with it. sanity_check_blocks() below is what stops that leniency turning
+# into a block that silently stopped being drawn.

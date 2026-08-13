@@ -9,16 +9,25 @@
 // What the board changes, and why each line here is what it is:
 //
 //   1. Every pin moves. GPIO map is README section 6, and it is the contract.
+//      The map is grouped by which side of the carrier each circuit sits on,
+//      because the two 22-way sockets slot every plane layer: analog, CAN and
+//      the SD bus all hang off the J1 row, K-line and I2C off the J3 row.
 //   2. The wideband divider is 15k/26k, not 10k/10k. DIVIDER_GAIN was 2.0 and
 //      is now 1.7334 — the original constant reads 17 % high here, and the
 //      firmware's own 5.5 V clamp then hides the top of the range.
-//   3. The +5 V sensor excitation is switched and OFF at reset. Nothing on the
-//      harness reads anything until SENS_EN goes high.
+//   3. The +5 V sensor excitation is permanently on, fed from USB through a
+//      polyfuse. The parent board switched it so firmware could shed 80 mA
+//      and stretch a 127 ms ride-through; the supercap bank here holds
+//      seconds, so the switch and its GPIO went away.
 //   4. WS2812 data goes through a 74AHCT1G125 whose input floats from reset,
 //      so GPIO48 is driven low before the LED driver ever touches it.
-//   5. There is a power-fail signal and 108 ms of ride-through behind it, and
-//      a microSD card that will be left corrupt if that window is not spent.
-//      README section 2 states the contract; shutdown() honours it.
+//   5. There is a power-fail signal and roughly 2.5 s of supercap behind it,
+//      and a microSD card that will be left corrupt if that window is not
+//      spent. README section 2 states the contract; shutdown() honours it.
+//      The signal now watches the 5 V USB rail, not a 12 V harness.
+//   6. K-line (ISO 9141 / KWP2000) is wired to GPIO41/42 through a discrete
+//      low-side FET and a divider. TX is inverted in hardware, so the UART
+//      needs UART_SIGNAL_TXD_INV. Nothing in this sketch drives it yet.
 //
 // GATT is unchanged, so the existing WidebandBleManager in the logger app
 // pairs with this board without modification.
@@ -40,12 +49,19 @@
 
 #define CAN_TX_PIN  GPIO_NUM_17
 #define CAN_RX_PIN  GPIO_NUM_18
-#define CAN_S_PIN   21            // low = normal, high = listen-only
+#define CAN_S_PIN   16            // low = normal, high = listen-only
 
-#define PWR_FAIL_PIN 15           // rising = harness below 11 V
-#define SENS_EN_PIN  16           // high = +5VS live; off at reset
-#define SD_PWR_EN_PIN 7
-#define SD_CD_PIN     8
+#define PWR_FAIL_PIN 15           // rising = the 5 V rail is below 4.20 V
+
+// K-line, not yet driven. Listed so the pin map in this file stays the whole
+// pin map -- a GPIO that is documented nowhere is a GPIO someone reuses.
+#define K_TX_PIN     41           // low-side FET gate; UART TX must be inverted
+#define K_RX_PIN     42           // divided 22k/10k and clamped
+// These two live on the far socket row from the card itself. They are the
+// only SD signals that do, and deliberately: they are DC, so crossing the
+// board costs nothing, while the six bus lines stay beside the slot.
+#define SD_PWR_EN_PIN 40
+#define SD_CD_PIN     21
 #define SD_CLK_PIN 14
 #define SD_CMD_PIN 13
 #define SD_D0_PIN  12
@@ -85,13 +101,19 @@ unsigned long canFrames = 0;      // frames since the last status line
 // of the R53 board's 10k/10k, and using it here reads 17 % high all the way up
 // the range. gen/simulate_firmware.py study 3 measures it end to end.
 static const float DIVIDER_GAIN = 1.7334f;
-static const int   ESP_ADC_PIN  = 1;       // AIN1 = GPIO1 = ADC1_CH0
-static const int   VBAT_ADC_PIN = 6;       // VBAT_SNS = GPIO6, divided by 11
-static const float VBAT_DIVIDER = 11.0f;
+static const int   ESP_ADC_PIN  = 4;       // AIN1 = GPIO4 = ADC1_CH3
+static const int   VBAT_ADC_PIN = 8;       // VBAT_SNS = GPIO8, from OBD-II pin 16
+// 108.2k / 8.2k, not the 11.0 this file inherited. The schematic moved to
+// 13.2:1 so a 36 V input would not saturate the ADC and the constant never
+// followed, so every battery reading was 20 % low. The fwsim board model
+// carried the same wrong 1/11, which is why nothing caught it: the two agreed
+// with each other and neither agreed with the board.
+static const float VBAT_DIVIDER = 13.195f;
 
 // I2C is on the Qwiic header, not the pins the R53 board used — GPIO7 and
 // GPIO8 are the microSD supply enable and card detect here.
-static const int   ADS_SDA_PIN  = 38;
+// IO38 is the DevKitC-1 v1.1 onboard RGB LED; SDA lives on IO47 here.
+static const int   ADS_SDA_PIN  = 47;
 static const int   ADS_SCL_PIN  = 39;
 static const uint8_t ADS_ADDR   = 0x48;
 static const float   ADS_LSB_MV = 0.125f;  // GAIN_ONE (+-4.096 V)
@@ -131,10 +153,10 @@ bool adsTried   = false;
 
 // --- Power fail --------------------------------------------------------------
 //
-// Set from the ISR, read from loop(). The ISR also drops SENS_EN itself rather
-// than leaving it to the main loop: it is one register write, and it doubles
-// the ride-through budget from 53 ms to 108 ms (sim/ridethru.png). Every
-// millisecond it buys is a millisecond the card has to finish its write.
+// Set from the ISR, read from loop(). The ISR used to drop SENS_EN here as
+// well, to double a 53 ms budget to 108 ms. There is no sensor switch any
+// more and the budget is measured in seconds, so the ISR does the one thing
+// it still has to: latch the flag and get out.
 volatile bool powerFailed = false;
 bool shuttingDown = false;
 
@@ -150,7 +172,6 @@ void shutdown();
 
 void IRAM_ATTR onPowerFail() {
   powerFailed = true;
-  digitalWrite(SENS_EN_PIN, LOW);
 }
 
 /**
@@ -249,7 +270,20 @@ void ensureAdsProbed() {
   adsTried = true;
   Wire.begin(ADS_SDA_PIN, ADS_SCL_PIN);
   Wire.setClock(400000);
-  if (!adsWriteReg(0x01, 0x4283)) return;   // continuous AIN0, +-4.096 V, 128 SPS
+  // 0x1283, not 0x4283: MUX 001 is AIN0 referenced to AIN3, not to GND.
+  //
+  // AIN3 on both parts carries AGND_SENSE -- the sensor loom's own ground,
+  // brought back as a Kelvin wire through an attenuator identical to the
+  // signal channels'. The board is grounded twice (through the loom, and
+  // through USB by way of a charger somewhere else in the car), and a few
+  // hundred millivolts of chassis drop between those points is 6 % of a
+  // 0-5 V channel. Reading differentially subtracts it exactly, because both
+  // legs are divided by the same 15/26.
+  //
+  // Read single-ended (0x4283) and the offset is measured as signal. The
+  // 0.1 % divider resistors on this board are wasted money if this register
+  // is wrong.
+  if (!adsWriteReg(0x01, 0x1283)) return;  // AIN0-AIN3, +-4.096 V, 128 SPS
   delay(10);
   uint16_t check = 0;
   adsPresent = adsReadReg(0x01, &check);
@@ -317,8 +351,11 @@ void logSample(float volts, float vbat) {
 void shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
-  digitalWrite(SENS_EN_PIN, LOW);          // idempotent; the ISR got here first
 
+  // The LEDs are the one load worth shedding: eight WS2812s at full white is
+  // 480 mA against the ~120 mA the rest of the board draws, and the hold-up
+  // budget is inversely proportional to it. Clearing them first turns a
+  // 769 ms worst case back into 2500 ms.
   FastLED.clear(true);
 
   if (sdUp) {
@@ -484,12 +521,6 @@ void setup() {
   // section 7, item 9). Drive it low before FastLED claims the pin.
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
-
-  // +5VS is off at reset by design: it is an external load firmware must be
-  // able to shed. Nothing on the sensor harness reads anything until this
-  // goes high, and every analog reading before it is a zero.
-  pinMode(SENS_EN_PIN, OUTPUT);
-  digitalWrite(SENS_EN_PIN, HIGH);
 
   // Armed before anything slow runs. An ignition cut during BLE bring-up is
   // still an ignition cut, and the card is not open yet but the interrupt

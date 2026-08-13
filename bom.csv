@@ -1,98 +1,73 @@
 Qty (1 board),Qty (10 boards),References,Value,Voltage,Tolerance,Footprint,Manufacturer part number,LCSC,Notes
-1,10,C1,1uF,50V,,Capacitor_SMD:C_0805_2012Metric,,C28323,LM74700 charge-pump reservoir
-4,40,C10 C11 C19 C20,2.2nF,50V,,Capacitor_SMD:C_0805_2012Metric,,C28260,Bootstrap: datasheet mandates exactly 2.2nF X7R -- a larger value overstresses the internal VCC regulator and damages the device
-2,20,C12 C21,270pF,50V,,Capacitor_SMD:C_0805_2012Metric,,C1732,Ramp coupling capacitor CB
-4,40,C13 C14 C22 C23,22uF,16V,,Capacitor_SMD:C_1206_3216Metric,,C12891,
-15,150,C15 C24 C28 C29 C31 C32 C34 C35 C36 C38 C39 C40 C41 C42 C43,100nF,16V,,Capacitor_SMD:C_0805_2012Metric,,C49678,
-3,30,C16 C2 C5,100nF,100V,,Capacitor_SMD:C_0805_2012Metric,,C28233,LM74700 ANODE input capacitor: the datasheet requires a minimum 22nF at ANODE and this node is behind FB1 with nothing else on it
-4,40,C25 C27 C30 C33,10uF,16V,,Capacitor_SMD:C_1206_3216Metric,,C13585,
-1,10,C26,1uF,16V,,Capacitor_SMD:C_0805_2012Metric,,C28323,EN reset delay
-1,10,C3,100uF,100V,,Capacitor_SMD:CP_Elec_10x10.5,Nichicon UCD2A101MNL1GS,,Bulk hold-up; any 100uF >=80V SMD electrolytic on a 10x10.5 land works -- match in the JLC catalog at order. Pin 1 is +
-1,10,C37,4.7nF,50V,,Capacitor_SMD:C_0805_2012Metric,,C1744,Split-termination common-mode stabiliser
-2,20,C17 C4,10uF,100V,,Capacitor_SMD:C_1206_3216Metric,,C6872041,Switcher input bypass
-2,20,C6 C7,330uF,100V,,Capacitor_SMD:CP_Elec_16x22,,,"Power-fail ride-through. With the sensor rail shed and the LEDs off the board draws about 0.35 W here, so the bank holds the rails up long enough to finish the block in flight and close the file. 16x22 rather than 16x17.5: the two footprints are identical in every copper and courtyard layer -- only the can is 4.5 mm taller -- so the extra 220 uF costs nothing but enclosure height. Any 330uF >=80V on a 16 mm land works; match in the JLC catalogue at order. Pin 1 is +"
-1,10,C8,1nF,50V,,Capacitor_SMD:C_0805_2012Metric,,C46653,Just enough to keep switching noise off the reference. Larger would delay the very detection this exists to make early
-2,20,C18 C9,10nF,100V,,Capacitor_SMD:C_0805_2012Metric,,C128805,EN sits on a bare 100k to VBAT; this keeps a high-impedance enable node quiet in a vehicle
-1,10,D1,SMCJ40CA,,,Diode_SMD:D_SMC,Littelfuse SMCJ40CA,C80273,"40V standoff / 64.5V clamp @ 1500W, bidirectional: absorbs ISO 7637-2 pulse 5b load dump and the negative pulses, ahead of the FET. 40V not 33V so the part stands off the declared 36V input top"
-1,10,D2,3.6V 300mW,,,Diode_SMD:D_SOD-323,onsemi MM3Z3V6T1G,C116949,Rail clamp: an analog input shorted to battery back-feeds ~1.6mA through its BAT54S into +3V3; with the MCU asleep the rail would otherwise float above the ESP32's 3.6V absolute maximum
+1,10,C1,100nF,100V,,Capacitor_SMD:C_0805_2012Metric,,C28233,
+1,10,C17,4.7nF,50V,,Capacitor_SMD:C_0805_2012Metric,,C1744,Split-termination common-mode stabiliser
+2,20,C2 C4,22uF,16V,,Capacitor_SMD:C_1206_3216Metric,,C12891,Bulk at the 5 V socket pin
+15,150,C11 C12 C14 C15 C16 C18 C19 C20 C21 C22 C23 C24 C25 C3 C5,100nF,16V,,Capacitor_SMD:C_0805_2012Metric,,C49678,
+2,20,C6 C7,1F,2.7V,,Capacitor_THT:CP_Radial_D8.0mm_P3.50mm,Eaton HB1030-2R5105-R,,"Hold-up cell 1 of 2 in series -> 0.5 F at 5.4 V. Anything from 0.1 F up works; 0.1 F still gives 500 ms. ESR must be under about 1 ohm -- check it, coin-type EDLCs are 30-200 ohm and will not work here"
+1,10,C8,1nF,50V,,Capacitor_SMD:C_0805_2012Metric,,C46653,Keeps switching noise off the reference
+3,30,C10 C13 C9,10uF,16V,,Capacitor_SMD:C_1206_3216Metric,,C13585,
+4,40,D1 D5 D6 D7,SMAJ26CA,,,Diode_SMD:D_SMA,Diodes Inc SMAJ26CA-13-F,C134976,"Clamps the OBD 12 V node. 400 W is enough here, not the parent's 1500 W SMC: nothing downstream draws more than 25 mA, so there is no load-dump energy to carry into a converter -- only a clamp to hold"
+1,10,D2,SS14,,,Diode_SMD:D_SMA,SS14,C2480,"Discharge path, bypassing the charge resistor. Anode on the bank: it conducts only once the rail has sagged a diode drop below the bank, which is exactly when the supply has gone away"
 1,10,D3,SMAJ6.0A,,,Diode_SMD:D_SMA,Littelfuse SMAJ6.0A,C223993,"Clamps harness-injected transients on the sensor 5V. 6.0V standoff, not 5.0V: a 5.0V part on a 5.0V rail leaks up to 800uA continuously"
-1,10,D4,green,,,LED_SMD:LED_0805_2012Metric,,C2297,"The board's only LED: +3V3 is up, so the whole supply chain came through -- battery, ideal diode, and both converters"
-1,10,D5,40V 1A,,,Diode_SMD:D_SOD-123,PMEG4010,C193342,"OR-ing: bench USB can power the board, but the 5V buck (5.00V) reverse-biases it whenever the car is connected"
-2,20,D6 D7,SMAJ26CA,,,Diode_SMD:D_SMA,Diodes Inc SMAJ26CA-13-F,C134976,Bidirectional bus clamp
-4,40,D10 D12 D14 D8,SMAJ40CA,,,Diode_SMD:D_SMA,Littelfuse SMAJ40CA,C223989,"Ch1 harness transient clamp (bidirectional, 400W)"
-5,50,D11 D13 D15 D16 D9,BAT54S,,,Package_TO_SOT_SMD:SOT-23,MDD BAT54S,C408389,Ch1 rail clamp (both polarities)
-1,10,F1,2A slow,,,Fuse:Fuse_1206_3216Metric,Littelfuse 0466002.NR,C187595,"Sacrificial: only opens on a hard fault, not on reverse polarity"
-1,10,FB1,600R,,,Inductor_SMD:L_1206_3216Metric,Wurth 742792625,C1533835,Conducted-emissions bead
-1,10,FB2,600R,,,Inductor_SMD:L_0805_2012Metric,Wurth 742792022,C2661452,
+1,10,D4,green,,,LED_SMD:LED_0805_2012Metric,,C2297,"Shield 3V3 is up, which means the dev board is in its socket the right way round and its LDO is running"
+7,70,D10 D12 D14 D16 D18 D19 D8,BAT54S,,,Package_TO_SOT_SMD:SOT-23,MDD BAT54S,C408389,"RX clamp. This one is not optional -- it conducts on every recessive bit above 11.5 V of battery, which is most of them"
+5,50,D11 D13 D15 D17 D9,SMAJ40CA,,,Diode_SMD:D_SMA,Littelfuse SMAJ40CA,C223989,"Ch1 harness transient clamp (bidirectional, 400W)"
+1,10,F1,0.5A slow,,,Fuse:Fuse_1206_3216Metric,Littelfuse 0466.500NR,,Protects the optional K-line pull-up only. The battery-sense divider is 100k and cannot pass enough current to matter
+1,10,FB1,600R,,,Inductor_SMD:L_0805_2012Metric,Wurth 742792022,C2661452,
 4,40,H1 H2 H3 H4,M3,,,MountingHole:MountingHole_3.2mm_M3,,,
-1,10,J1,PWR + CAN harness,,,Connector_JST:JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical,JST B4B-PH-K-S(LF)(SN),C131334,"Pin 1 +12V, 2 GND, 3 CAN_H, 4 CAN_L (Autosport Labs harness order)"
-1,10,J10,Sensor harness,,,Connector_JST:JST_PH_B8B-PH-K_1x08_P2.00mm_Vertical,JST B8B-PH-K-S(LF)(SN),C157974,Two 5V and two ground pins so sensors can be paired up
-1,10,J2,USB-C,,,Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12,HRO TYPE-C-31-M-12,C165948,Programming / CDC console only -- not a power path in the car
-1,10,J3,UART0,,,Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical,,,
-1,10,J4,I2C / Qwiic,,,Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical,,,
-1,10,J5,SPI,,,Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical,,,IO40 SCK / IO41 MISO / IO42 MOSI / IO47 CS -- GPIO-matrix SPI
-1,10,J6,WS2812,,,Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical,,,Shift-light header: +5V / 5V-logic DIN / GND
-1,10,J7,Spare IO,,,Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical,,,"IO3/IO45/IO46 are strapping pins, each with a 10k pull-down -- anything attached must not fight them at boot. Pins 4 and 5 are no longer spare: IO15 is the power-fail interrupt and IO16 is the sensor-rail enable. They stay on the header as probe points, so the ride-through can be watched on a scope without unsoldering anything, but nothing else may drive them. The ground pin is here so a probe or a ribbon has a return"
-1,10,J8,Rail break-out,,,Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical,,,
-1,10,J9,microSD push-pull,,,Connector_Card:microSD_HC_Hirose_DM3D-SF,Hirose DM3D-SF,C719027,Push-pull socket; DET is the card-present switch
+1,10,J1,OBD-II harness,,,Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical,JST B6B-PH-K-S(LF)(SN),C157964,"OBD-II pins 16/4/6/14/7/5. Pin 1 is sense only -- the board is powered from the dev board's USB-C, not from here"
+1,10,J2,DevKit J1,,,Connector_PinSocket_2.54mm:PinSocket_1x22_P2.54mm_Vertical,ESP32-S3-DevKitC-1 J1,,"Mirrors DevKitC-1 J1. Pins 1-2 (3V3) and 21 (5V) are both INPUTS to the shield. Analog on 4-7 and 12, CAN on 9-11, SD bus on 15-20 -- grouped so each block routes away from the row rather than across it. Pin 3 is RST, pins 13/14 are IO3/IO46, all left open."
+1,10,J3,DevKit J3,,,Connector_PinSocket_2.54mm:PinSocket_1x22_P2.54mm_Vertical,ESP32-S3-DevKitC-1 J3,,"Mirrors DevKitC-1 J3. K-line on 6/7, I2C on 9/17, WS2812 on 16, and the SD card's two DC control lines on 8/18 -- the only nets that cross to the other side of the board, and they go round the end of the row. Pin 10 (IO38) is left open because it drives the dev board's RGB LED on v1.1; check the revision, some put it on IO48, which is the WS2812 output here."
+1,10,J4,I2C / Qwiic,,,Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical,,,External I2C sensors. Kept because the dev board has no Qwiic connector of its own
+1,10,J5,WS2812,,,Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical,,,Shift-light header: +5V / 5V-logic DIN / GND
+1,10,J6,Rail break-out,,,Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical,,,
+1,10,J7,microSD push-pull,,,Connector_Card:microSD_HC_Hirose_DM3D-SF,Hirose DM3D-SF,C719027,Push-pull socket; DET is the card-present switch
+1,10,J8,Sensor harness,,,Connector_JST:JST_PH_B10B-PH-K_1x10_P2.00mm_Vertical,JST B10B-PH-K-S(LF)(SN),C157966,"Two 5V excitation pins, two Kelvin sense-ground pins, two current-carrying grounds, four signals. SENS_RTN must land on the SENSOR's ground stud, not on the same stud as pins 9/10"
+1,10,J9,Spare diff in,,,Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical,,,"The second ADC's unused pair, brought out raw -- 0-3.3V only, no divider and no clamp in front of them. For a bench sensor, not for the loom"
 1,10,JP1,TERM (default OFF),,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,"Ships OPEN: unterminated. Bridge the pads only when this board is an END node on its own bus. A vehicle's bus -- OBD-II diagnostics included -- is already terminated at both ends, and a third 120 ohm across the pair takes it to about 40 ohm and can stop it working. Defaulting terminated made that an easy mistake to make"
-1,10,JP10,RANGE3 (default 0-5V),,,Jumper:SolderJumper-3_P1.3mm_Bridged12_Pad1.0x1.5mm,,,"Ships BRIDGED 1-2 = the 0-5V range, which is what almost every automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut 1-2 and leave both open for no divider (then close BYPASS3 for a raw 0-3.3V sensor). Defaulting to 0-5V also means the firmware's DIVIDER_GAIN matches the board as shipped"
-1,10,JP11,PULLUP4,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for 2-wire NTC / open-collector sensors
-1,10,JP12,BYPASS4,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for a raw 0-3.3V sensor (shorts the upper leg)
-1,10,JP13,RANGE4 (default 0-5V),,,Jumper:SolderJumper-3_P1.3mm_Bridged12_Pad1.0x1.5mm,,,"Ships BRIDGED 1-2 = the 0-5V range, which is what almost every automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut 1-2 and leave both open for no divider (then close BYPASS4 for a raw 0-3.3V sensor). Defaulting to 0-5V also means the firmware's DIVIDER_GAIN matches the board as shipped"
-1,10,JP2,PULLUP1,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for 2-wire NTC / open-collector sensors
-1,10,JP3,BYPASS1,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for a raw 0-3.3V sensor (shorts the upper leg)
-1,10,JP4,RANGE1 (default 0-5V),,,Jumper:SolderJumper-3_P1.3mm_Bridged12_Pad1.0x1.5mm,,,"Ships BRIDGED 1-2 = the 0-5V range, which is what almost every automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut 1-2 and leave both open for no divider (then close BYPASS1 for a raw 0-3.3V sensor). Defaulting to 0-5V also means the firmware's DIVIDER_GAIN matches the board as shipped"
-1,10,JP5,PULLUP2,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for 2-wire NTC / open-collector sensors
-1,10,JP6,BYPASS2,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for a raw 0-3.3V sensor (shorts the upper leg)
-1,10,JP7,RANGE2 (default 0-5V),,,Jumper:SolderJumper-3_P1.3mm_Bridged12_Pad1.0x1.5mm,,,"Ships BRIDGED 1-2 = the 0-5V range, which is what almost every automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut 1-2 and leave both open for no divider (then close BYPASS2 for a raw 0-3.3V sensor). Defaulting to 0-5V also means the firmware's DIVIDER_GAIN matches the board as shipped"
-1,10,JP8,PULLUP3,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for 2-wire NTC / open-collector sensors
-1,10,JP9,BYPASS3,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for a raw 0-3.3V sensor (shorts the upper leg)
-1,10,L1,33uH,,,Inductor_SMD:L_Sunlord_SWPA8040S,Sunlord ASWPA8050S330MT,C340244,"Shielded molded, Isat 3A vs the 1.75A max peak limit"
-1,10,L2,22uH,,,Inductor_SMD:L_Sunlord_SWPA8040S,Sunlord ASWPA8050S220MT,C340243,"Same automotive series as L1. C340243 verified against the live JLC catalogue 2026-08-12: 22uH, 3A Isat, 8x8mm -- one part number below L1's C340244, which is the 33uH of the same series"
-1,10,L3,51uH,,,esp32autosport:L_CommonMode_TDK_ACT45B,TDK ACT45B-510-2P-TL003,C76584,AEC-Q200 CAN choke; footprint pads renumbered so symbol winding 1-2 is the package's top (1-4) winding
-1,10,PF1,0.2A PTC,,,Resistor_SMD:R_1206_3216Metric,Bourns MF-MSMF020,C719178,"Resettable: a shorted sensor wire trips this, not the board. Now behind the load switch, so a short is also something firmware can clear by dropping SENS_EN, rather than waiting for the fuse to cool"
-2,20,PF2 PF3,0.5A hold,,,Resistor_SMD:R_1206_3216Metric,Bourns MF-MSMF050,C17313,
-1,10,Q1,IPD068N10,,,Package_TO_SOT_SMD:TO-252-3_TabPin2,Infineon IPD068N10N3G,C88066,"Source to battery, drain to load: body diode blocks reverse polarity. The previously specified PSMN4R3-100BSE does not exist"
-2,20,Q2 Q4,AO3401A,,,Package_TO_SOT_SMD:SOT-23,Alpha & Omega AO3401A,C15127,"Sensor-rail load switch. Source to +5V, so the body diode points into the rail and the switch blocks with the gate high"
-1,10,Q3,2N7002,,,Package_TO_SOT_SMD:SOT-23,onsemi 2N7002,C8545,"Level shifter: the P-FET's gate has to be pulled to GND from 5V, and a 3.3V GPIO cannot do that directly"
-1,10,Q5,MMBT3906,,,Package_TO_SOT_SMD:SOT-23,ST(Semtech) MMBT3906,C84105,"Pulls the P-FET gate to its source on overvoltage. NOTE: this was C8544 until 2026-08-12, which is an S9018 -- an NPN, and not this part at all. Ordering it would have assembled the wrong polarity into the USB over-voltage cutoff and left the protection inoperative. Verified against the live catalogue: C84105 is an ST(Semtech) MMBT3906, PNP, SOT-23, 40 V"
-1,10,Q6,DMG2301L,,,Package_TO_SOT_SMD:SOT-23,DMG2301L,C7472914,High-side switch so firmware can power-cycle a wedged card
-1,10,Q7,2N7002,,,Package_TO_SOT_SMD:SOT-23,2N7002,C8545,Level shift for the P-ch gate. Prefer an AEC-Q101 equivalent: the standard 2N7002 is not automotive qualified
-13,130,R1 R10 R12 R15 R16 R18 R21 R27 R39 R41 R7 R77 R9,100k,,,Resistor_SMD:R_0805_2012Metric,,C149504,UVLO upper leg
-2,20,R11 R13,31.6k,,,Resistor_SMD:R_0805_2012Metric,,C49254250,"RON = 5.0V x 2500 / 400kHz (Eq 12) -> 396kHz; tON = 237ns at the 53.3V clamp, comfortably above the 50ns minimum"
-1,10,R14,121k,,,Resistor_SMD:R_0805_2012Metric,,C17438,Ripple-injection ramp resistor RA
-1,10,R17,20.5k,,,Resistor_SMD:R_0805_2012Metric,,C2933365,"RON = 3.3V x 2500 / 400kHz (Eq 12) -> 402kHz; tON = 154ns at the 53.3V clamp, above the 50ns minimum"
-1,10,R19,57.6k,,,Resistor_SMD:R_0805_2012Metric,,C163405,FB lower
-1,10,R2,44.2k,,,Resistor_SMD:R_0805_2012Metric,,C2960780,"UVLO lower leg. Ratio 0.3065 against V_EN_IH 1.06/2.0/2.6V gives release at 3.5/6.5/8.5V. The earlier 25.5k assumed a 1.2V threshold and would not have started until 9.8V typical, 12.8V worst case"
-1,10,R20,95.3k,,,Resistor_SMD:R_0805_2012Metric,,C2930435,Ripple-injection ramp resistor RA
-2,20,R22 R40,1k,,,Resistor_SMD:R_0805_2012Metric,,C17513,
-2,20,R25 R26,5.1k,,,Resistor_SMD:R_0805_2012Metric,,C27834,
-2,20,R29 R3,100k,,1%,Resistor_SMD:R_0805_2012Metric,,C5713386,"Power-fail divider, upper leg"
-1,10,R30,27.4k,,1%,Resistor_SMD:R_0805_2012Metric,,C2930188,"Trip at 1.24V x 127.4/27.4 = 5.77V: above a compliant source's 5.25V ceiling, below the TJA1051's 6V absolute maximum"
-2,20,R31 R32,4.7k,,,Resistor_SMD:R_0805_2012Metric,,C17673,
-7,70,R34 R42 R43 R44 R45 R46 R47,33,,,Resistor_SMD:R_0805_2012Metric,,C17634,Edge-rate limit into the level shifter
-1,10,R35,100,,,Resistor_SMD:R_0805_2012Metric,,C17408,"Series termination into the strip. The buffer drove the connector directly, and a WS2812 strip is metres of unterminated lead"
-1,10,R4,12.7k,,1%,Resistor_SMD:R_0805_2012Metric,,C2933300,"Lower leg: trips at 1.24V * 112.7/12.7 = 11.00V on the harness, below anything a healthy battery does and far above the converters' dropout, so there is a whole ride-through between detect and death"
-15,150,R23 R24 R28 R33 R36 R37 R38 R48 R49 R5 R50 R51 R52 R54 R8,10k,,,Resistor_SMD:R_0805_2012Metric,,C17414,"Cathode pull-up. 10k gives the part 330uA, over the TLV431's 100uA minimum cathode current. A 2.5V TL431 would need 1mA and so a 2.2k here, and the divider below would have to change with it"
-1,10,R53,47k,,,Resistor_SMD:R_0805_2012Metric,,C17713,Card-detect pull-up
-2,20,R55 R56,60.4,,,Resistor_SMD:R_0805_2012Metric,,C72998,Split termination upper half
-4,40,R57 R62 R67 R72,1k,,0.1%,Resistor_SMD:R_0805_2012Metric,,C864177,"Ch1 series/fault-current limit; 0.1% thin film -- it is inside the divider chain, so its tolerance is a gain error"
-4,40,R58 R63 R68 R73,2.49k,,,Resistor_SMD:R_0805_2012Metric,,C2930178,Ch1 bias resistor
-4,40,R59 R64 R69 R74,10k,,0.1%,Resistor_SMD:R_0805_2012Metric,,C856630,"Ch1 divider upper leg, 0.1% thin film for AFR-grade accuracy"
-1,10,R6,1M,,,Resistor_SMD:R_0805_2012Metric,,C17514,"Hysteresis, about 0.3V at the harness. Without it a battery sagging across the threshold on crank would chatter the interrupt"
-4,40,R60 R65 R70 R75,15k,,0.1%,Resistor_SMD:R_0805_2012Metric,,C728642,0-5V range: 5.0V in -> ~2.88V at the ADC (1k series included); exact scale is a firmware calibration constant
-4,40,R61 R66 R71 R76,2.21k,,0.1%,Resistor_SMD:R_0805_2012Metric,,C865368,0-16V range: 16.0V in -> ~2.67V at the ADC (1k series included)
-1,10,R78,8.2k,,,Resistor_SMD:R_0805_2012Metric,,C17828,"Divide by 13.2, not 11: at 36V the 11:1 divider put 3.27V on the pin, above the ADC's usable 3.1V, so the reading saturated near the top of the declared input window"
-1,10,SW1,RESET,,,Button_Switch_SMD:SW_SPST_TL3342,TL3342F160QG,C2886898,Genuine E-Switch is scarce at LCSC; any 5.2mm gull-wing tact fits
-1,10,SW2,BOOT,,,Button_Switch_SMD:SW_SPST_TL3342,TL3342F160QG,C2886898,
-1,10,U1,LM74700-Q1,,,Package_TO_SOT_SMD:SOT-23-6,LM74700QDBVRQ1,C2941042,Ideal-diode controller; blocks reverse battery via Q1
-2,20,U10 U11,SRV05-4,,,Package_TO_SOT_SMD:SOT-23-6,Semtech SRV05-4.TCT,C13612,"Card-slot ESD clamp, CLK/CMD/D0/D1"
-1,10,U12,TJA1051T/3,,,Package_SO:SOIC-8_3.9x4.9mm_P1.27mm,"TJA1051T/3,118",C58988,"5V bus drive with a 3.3V VIO pin, so no level shifting to the ESP32"
-1,10,U13,ADS1115,,,Package_SO:VSSOP-10_3x3mm_P0.5mm,ADS1115IDGSR,C37593,16-bit 4-ch I2C ADC for AFR-grade accuracy; ADDR to GND = 0x48
-2,20,U2 U6,TLV431A,,,Package_TO_SOT_SMD:SOT-23,TLV431ASN1T1G,C127592,"Power-fail comparator. Below the trip point it stops conducting and R_pu takes PWR_FAIL high, so the interrupt is a rising edge and an absent or dead part reads as 'failing' rather than as 'fine'. PINOUT: this uses KiCad's TL431DBZ numbering (1 K, 2 REF, 3 A) on a plain SOT-23. Shunt references are NOT consistent between vendors in this package -- CONFIRM against the datasheet for the exact part ordered. If REF and A are swapped the part simply never conducts and PWR_FAIL sits permanently asserted: loud, harmless, and obvious on the bench, but it will not be caught by ERC or DRC"
-1,10,U3,LM5164 (5V),,,Package_SO:SOIC-8-1EP_3.9x4.9mm_P1.27mm_EP2.95x4.9mm_Mask2.71x3.4mm_ThermalVias,LM5164DDAR,C477928,"100V synchronous buck, ultra-low Iq. Non-automotive variant; the Q1 is scarce"
-1,10,U4,LM5164 (3V3),,,Package_SO:SOIC-8-1EP_3.9x4.9mm_P1.27mm_EP2.95x4.9mm_Mask2.71x3.4mm_ThermalVias,LM5164DDAR,C477928,Second buck straight off the battery: a shorted 5V sensor harness cannot brown out the MCU
-1,10,U5,ESP32-S3-WROOM-1-N16R8,,,RF_Module:ESP32-S3-WROOM-1,ESP32-S3-WROOM-1-N16R8,C2913202,16MB flash / 8MB octal PSRAM. Pins 28-30 (IO35/36/37) are consumed by the octal PSRAM and must stay unconnected. IO3/IO45/IO46 on the spare header are strapping pins -- leave floating at boot.
-2,20,U7 U8,USBLC6-2SC6,,,Package_TO_SOT_SMD:SOT-23-6,USBLC6-2SC6,C7519,"USB ESD clamp, behind the OVP switch so its own 5.5 V VBUS-pin limit is honoured too"
-1,10,U9,74AHCT1G125,,,Package_TO_SOT_SMD:SOT-23-5,SN74AHCT1G125DBVR,C7484,"5 V buffer so WS2812 DIN is a real 5 V rail, not 3.3 V hoping"
+1,10,JP10,BYPASS3,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for a raw 0-3.3V sensor (shorts the upper leg)
+1,10,JP11,RANGE3 (default 0-5V),,,Jumper:SolderJumper-3_P1.3mm_Bridged12_Pad1.0x1.5mm,,,"Ships BRIDGED 1-2 = the 0-5V range, which is what almost every automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut 1-2 and leave both open for no divider (then close BYPASS3 for a raw 0-3.3V sensor). Defaulting to 0-5V also means the firmware's DIVIDER_GAIN matches the board as shipped. NOTE: moving a channel off the default breaks the match with the return attenuator, so that channel loses its ground rejection -- read it single-ended if you do"
+1,10,JP12,PULLUP4,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for 2-wire NTC / open-collector sensors
+1,10,JP13,BYPASS4,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for a raw 0-3.3V sensor (shorts the upper leg)
+1,10,JP14,RANGE4 (default 0-5V),,,Jumper:SolderJumper-3_P1.3mm_Bridged12_Pad1.0x1.5mm,,,"Ships BRIDGED 1-2 = the 0-5V range, which is what almost every automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut 1-2 and leave both open for no divider (then close BYPASS4 for a raw 0-3.3V sensor). Defaulting to 0-5V also means the firmware's DIVIDER_GAIN matches the board as shipped. NOTE: moving a channel off the default breaks the match with the return attenuator, so that channel loses its ground rejection -- read it single-ended if you do"
+1,10,JP2,KPU (default OFF),,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Ships OPEN. Bridge only if a module will not answer without a tester pull-up on the K-line
+1,10,JP3,PULLUP1,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for 2-wire NTC / open-collector sensors
+1,10,JP4,BYPASS1,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for a raw 0-3.3V sensor (shorts the upper leg)
+1,10,JP5,RANGE1 (default 0-5V),,,Jumper:SolderJumper-3_P1.3mm_Bridged12_Pad1.0x1.5mm,,,"Ships BRIDGED 1-2 = the 0-5V range, which is what almost every automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut 1-2 and leave both open for no divider (then close BYPASS1 for a raw 0-3.3V sensor). Defaulting to 0-5V also means the firmware's DIVIDER_GAIN matches the board as shipped. NOTE: moving a channel off the default breaks the match with the return attenuator, so that channel loses its ground rejection -- read it single-ended if you do"
+1,10,JP6,PULLUP2,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for 2-wire NTC / open-collector sensors
+1,10,JP7,BYPASS2,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for a raw 0-3.3V sensor (shorts the upper leg)
+1,10,JP8,RANGE2 (default 0-5V),,,Jumper:SolderJumper-3_P1.3mm_Bridged12_Pad1.0x1.5mm,,,"Ships BRIDGED 1-2 = the 0-5V range, which is what almost every automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut 1-2 and leave both open for no divider (then close BYPASS2 for a raw 0-3.3V sensor). Defaulting to 0-5V also means the firmware's DIVIDER_GAIN matches the board as shipped. NOTE: moving a channel off the default breaks the match with the return attenuator, so that channel loses its ground rejection -- read it single-ended if you do"
+1,10,JP9,PULLUP3,,,Jumper:SolderJumper-2_P1.3mm_Open_Pad1.0x1.5mm,,,Close for 2-wire NTC / open-collector sensors
+1,10,L1,51uH,,,esp32autosport:L_CommonMode_TDK_ACT45B,TDK ACT45B-510-2P-TL003,C76584,AEC-Q200 CAN choke; footprint pads renumbered so symbol winding 1-2 is the package's top (1-4) winding
+1,10,PF1,0.2A PTC,,,Resistor_SMD:R_1206_3216Metric,Bourns MF-MSMF020,C719178,"Resettable: a shorted sensor wire trips this, not the dev board's USB port"
+1,10,PF2,0.5A hold,,,Resistor_SMD:R_1206_3216Metric,Bourns MF-MSMF050,C17313,Fused tap for the shift-light strip (8x WS2812 ~0.5 A worst case)
+1,10,Q1,DMG2301L,,,Package_TO_SOT_SMD:SOT-23,DMG2301L,C7472914,High-side switch so firmware can power-cycle a wedged card
+1,10,Q2,2N7002,,,Package_TO_SOT_SMD:SOT-23,2N7002,C8545,Level shift for the P-ch gate. Prefer an AEC-Q101 equivalent: the standard 2N7002 is not automotive qualified
+1,10,Q3,2N7002,,,Package_TO_SOT_SMD:SOT-23,onsemi 2N7002,C8545,"K-line low-side driver. 60 V, so it stands off the clamped transient. Drain current in normal use is ~45 mA into the ECU's pull-up"
+8,80,R1 R13 R15 R2 R32 R60 R61 R62,100k,,,Resistor_SMD:R_0805_2012Metric,,C149504,"Cell balancing, upper"
+7,70,R11 R16 R17 R18 R19 R20 R21,33,,,Resistor_SMD:R_0805_2012Metric,,C17634,Edge-rate limit into the level shifter
+1,10,R12,100,,,Resistor_SMD:R_0805_2012Metric,,C17408,"Series termination into the strip. The buffer drove the connector directly, and a WS2812 strip is metres of unterminated lead"
+1,10,R27,47k,,,Resistor_SMD:R_0805_2012Metric,,C17713,Card-detect pull-up
+2,20,R29 R30,60.4,,,Resistor_SMD:R_0805_2012Metric,,C72998,Split termination upper half
+1,10,R3,22,,,Resistor_SMD:R_1206_3216Metric,,,"Inrush limit. 1206 for the pulse rating: 210 mA into 22 ohm is 1 W for the first instant, decaying with a 11 s time constant"
+1,10,R33,33,,,Resistor_SMD:R_1206_3216Metric,,C17634,"Series limit. ISO 9141-2 wants the tester's dominant below 0.2*Vb: against the ECU's 510 ohm alone that is 12*33/543 = 0.73 V, and with the optional pull-up below also stuffed it is 1.38 V, both inside 2.4 V. Sized down from 100 ohm for exactly that second case. A sustained short of K-line to battery while transmitting puts 364 mA through the FET, over its 115 mA continuous rating -- it survives the pulse, not the fault. 1206 for the same reason"
+1,10,R34,22k,,,Resistor_SMD:R_0805_2012Metric,,,"RX divider, upper leg"
+1,10,R36,510,,,Resistor_SMD:R_1206_3216Metric,,,The ISO 9141-2 tester pull-up value. 1206: 12 V across it while the line is dominant is 280 mW
+5,50,R37 R42 R47 R52 R57,1k,,0.1%,Resistor_SMD:R_0805_2012Metric,,C864177,"Ch1 series/fault-current limit; 0.1% thin film -- it is inside the divider chain, so its tolerance is a gain error"
+4,40,R38 R43 R48 R53,2.49k,,,Resistor_SMD:R_0805_2012Metric,,C2930178,Ch1 bias resistor
+5,50,R39 R44 R49 R54 R58,10k,,0.1%,Resistor_SMD:R_0805_2012Metric,,C856630,"Ch1 divider upper leg, 0.1% thin film for AFR-grade accuracy"
+1,10,R4,28.7k,,1%,Resistor_SMD:R_0805_2012Metric,,,"Power-fail divider, upper leg"
+5,50,R40 R45 R50 R55 R59,15k,,0.1%,Resistor_SMD:R_0805_2012Metric,,C728642,0-5V range: 5.0V in -> ~2.88V at the ADC (1k series included); exact scale is a firmware calibration constant
+4,40,R41 R46 R51 R56,2.21k,,0.1%,Resistor_SMD:R_0805_2012Metric,,C865368,0-16V range: 16.0V in -> ~2.67V at the ADC (1k series included)
+1,10,R5,12.0k,,1%,Resistor_SMD:R_0805_2012Metric,,,"Lower leg: trips at 1.24V * 40.7/12.0 = 4.20V. The rail sits at 4.5-4.7V loaded (USB 5 V less the dev board's Schottky and the cable drop), and the LDO above holds 3.3 V down to about 3.6 V in, so 4.20 is inside the margin at both ends"
+9,90,R22 R23 R24 R25 R26 R28 R31 R35 R6,10k,,,Resistor_SMD:R_0805_2012Metric,,C17414,"Cathode pull-up. 10k gives the part 330uA, over the TLV431's 100uA minimum cathode current"
+1,10,R63,8.2k,,,Resistor_SMD:R_0805_2012Metric,,C17828,"Divide by 13.2, not 11: at 36V the 11:1 divider put 3.27V on the pin, above the ADC's usable 3.1V, so the reading saturated near the top of the declared input window"
+1,10,R7,1M,,,Resistor_SMD:R_0805_2012Metric,,C17514,"Hysteresis, about 0.1 V at the rail. A USB rail is noisier than a battery and the trip point is only 300 mV below the working level, so this matters more here than it did on the parent"
+2,20,R14 R8,1k,,,Resistor_SMD:R_0805_2012Metric,,C17513,
+2,20,R10 R9,4.7k,,,Resistor_SMD:R_0805_2012Metric,,C17673,
+1,10,U1,TLV431A,,,Package_TO_SOT_SMD:SOT-23,TLV431ASN1T1G,C127592,"Power-fail comparator. Below the trip point it stops conducting and R_pu takes PWR_FAIL high, so the interrupt is a rising edge and an absent or dead part reads as 'failing' rather than as 'fine'. PINOUT: this uses KiCad's TL431DBZ numbering (1 K, 2 REF, 3 A) on a plain SOT-23. Shunt references are NOT consistent between vendors in this package -- CONFIRM against the datasheet for the exact part ordered. If REF and A are swapped the part simply never conducts and PWR_FAIL sits permanently asserted: loud, harmless, and obvious on the bench, but it will not be caught by ERC or DRC"
+1,10,U2,74AHCT1G125,,,Package_TO_SOT_SMD:SOT-23-5,SN74AHCT1G125DBVR,C7484,"5 V buffer so WS2812 DIN is a real 5 V rail, not 3.3 V hoping"
+2,20,U3 U4,SRV05-4,,,Package_TO_SOT_SMD:SOT-23-6,Semtech SRV05-4.TCT,C13612,"Card-slot ESD clamp, CLK/CMD/D0/D1"
+1,10,U5,TJA1051T/3,,,Package_SO:SOIC-8_3.9x4.9mm_P1.27mm,"TJA1051T/3,118",C58988,"5V bus drive with a 3.3V VIO pin, so no level shifting to the ESP32"
+1,10,U6,ADS1115 (0x48),,,Package_SO:VSSOP-10_3x3mm_P0.5mm,ADS1115IDGSR,C37593,"Channels 1-3. ADDR to GND = 0x48. Read AIN0-AIN3, AIN1-AIN3 and AIN2-AIN3: every one of them is a channel minus the shared sensor-ground reference"
+1,10,U7,ADS1115 (0x49),,,Package_SO:VSSOP-10_3x3mm_P0.5mm,ADS1115IDGSR,C37593,"Channel 4, plus two spare differential inputs on the pads below. ADDR to +3V3 = 0x49"

@@ -229,10 +229,35 @@ def accuracy_ladder(board, rail="none"):
     return "\n".join(lines) + "\n", steps
 
 
+# A 12 V cigarette-socket USB charger, plus the dev board's own input diode.
+# 1.0 V of headroom is typical for a small synchronous buck; 0.3 V is the
+# Schottky. Nominal output here is 4.70 V rather than 5.00 because that is
+# what the rail measures loaded, cable drop included.
+CHARGER_DROPOUT = 1.0
+DEVKIT_SCHOTTKY = 0.3
+USB_NOMINAL = 4.70
+
+
+def charger(vbat):
+    return max(0.0, min(USB_NOMINAL, vbat - CHARGER_DROPOUT - DEVKIT_SCHOTTKY))
+
+
 def replay(dat, column=1, *, board="autosport", duration_ms=None,
            step_ms=2.0, prologue="", scale=1.0):
-    """Turn an ngspice transient into vbat events so the firmware rides the
-    same waveform the circuit study produced."""
+    """Turn an ngspice transient into supply events so the firmware rides the
+    same waveform the circuit study produced.
+
+    Two nets come out of one waveform now. The trace is the vehicle battery,
+    which this board only senses (OBD-II pin 16). What it RUNS on is 5 V from
+    a USB charger in a cigarette socket, so the charger has to be modelled:
+    a buck regulating 5.0 V until its own input gets too low, then falling
+    with it, less the DevKitC-1's series Schottky.
+
+        v5 = min(4.70, vbat - CHARGER_DROPOUT - SCHOTTKY)
+
+    That single line is why a crank that used to be a survival question is
+    mostly a non-event now: the charger holds 5 V through a dip that would
+    have taken the parent board's +VBAT most of the way to its UVLO."""
     import numpy as np
     raw = np.loadtxt(dat)
     t_ms = raw[:, 0] * 1000.0
@@ -240,13 +265,18 @@ def replay(dat, column=1, *, board="autosport", duration_ms=None,
     if duration_ms is None:
         duration_ms = float(t_ms[-1])
     lines = [f"board {board}", "duration %.0f" % (duration_ms + 200), "trace 2",
-             "@0 vbat %.3f" % v[0], prologue.strip()]
-    last, t = None, 0.0
+             "@0 vbat %.3f" % v[0], "@0 usb %.3f" % charger(v[0]),
+             prologue.strip()]
+    last, last5, t = None, None, 0.0
     while t <= duration_ms:
         val = float(np.interp(t, t_ms, v))
         if last is None or abs(val - last) > 0.05:
             lines.append("@%.1f vbat %.3f" % (t, val))
             last = val
+        v5 = charger(val)
+        if last5 is None or abs(v5 - last5) > 0.02:
+            lines.append("@%.1f usb %.3f" % (t, v5))
+            last5 = v5
         t += step_ms
     return "\n".join(l for l in lines if l.strip()) + "\n"
 
@@ -365,19 +395,21 @@ def _wrap(text, indent, width=96):
 
 
 # ------------------------------------------------------------------ studies --
-# ESP32-S3-WROOM-1 module pin -> GPIO. The netlist records module pin numbers
-# because that is what the footprint has; every study here talks in GPIO
-# numbers because that is what firmware has. This table is the joint, and it is
-# the one place the two vocabularies meet.
-MODULE_PIN_TO_GPIO = {
-    39: 1, 38: 2, 4: 4, 5: 5, 6: 6, 7: 7, 12: 8,
-    17: 9, 18: 10, 19: 11, 20: 12, 21: 13, 22: 14,
-    8: 15, 9: 16, 10: 17, 11: 18, 13: 19, 14: 20, 23: 21,
-    31: 38, 32: 39, 36: 44, 37: 43,
-    33: 40, 34: 41, 35: 42, 24: 47, 25: 48,
-    27: 0, 15: 3, 16: 46, 26: 45, 28: 35, 29: 36, 30: 37,
+# The MCU is not on this board -- an ESP32-S3-DevKitC-1 drops into two 22-way
+# sockets. So a GPIO is reached through a socket pin, and the mapping is the
+# dev board's own J1/J3 pin order from its v1.1 user guide. Study 0 used to
+# read this off the module's footprint pins; with the module gone it found
+# nothing and reported every pin as a mismatch, which is the check doing its
+# job rather than a bug.
+SOCKET_PIN_TO_GPIO = {
+    # J2 on this board mirrors the dev board's J1
+    "J2": {4: 4, 5: 5, 6: 6, 7: 7, 8: 15, 9: 16, 10: 17, 11: 18, 12: 8,
+           13: 3, 14: 46, 15: 9, 16: 10, 17: 11, 18: 12, 19: 13, 20: 14},
+    # J3 mirrors the dev board's J3
+    "J3": {2: 43, 3: 44, 4: 1, 5: 2, 6: 42, 7: 41, 8: 40, 9: 39, 10: 38,
+           11: 37, 12: 36, 13: 35, 14: 0, 15: 45, 16: 48, 17: 47, 18: 21,
+           19: 20, 20: 19},
 }
-MODULE_REF = "U5"
 
 
 def study_pinmap(exes):
@@ -407,9 +439,9 @@ def study_pinmap(exes):
         if len(parts) < 2:
             continue
         for ref in parts[1:]:
-            m = re.fullmatch(re.escape(MODULE_REF) + r"\.(\d+)", ref)
-            if m:
-                gpio = MODULE_PIN_TO_GPIO.get(int(m.group(1)))
+            m = re.fullmatch(r"(J\d+)\.(\d+)", ref)
+            if m and m.group(1) in SOCKET_PIN_TO_GPIO:
+                gpio = SOCKET_PIN_TO_GPIO[m.group(1)].get(int(m.group(2)))
                 if gpio is not None:
                     netlist.setdefault(gpio, []).append(parts[0])
 
@@ -417,10 +449,8 @@ def study_pinmap(exes):
     for gpio in sorted(model):
         nets = netlist.get(gpio, [])
         if model[gpio] not in nets:
-            bad.append("GPIO%d: model says %s, %s.%s carries %s"
-                       % (gpio, model[gpio], MODULE_REF,
-                          [k for k, v in MODULE_PIN_TO_GPIO.items() if v == gpio],
-                          nets or "nothing"))
+            bad.append("GPIO%d: model says %s, the sockets carry %s"
+                       % (gpio, model[gpio], nets or "nothing"))
     for b in bad:
         print("    MISMATCH  %s" % b)
     check(not bad, "every modelled pin matches netlist.txt",
@@ -478,7 +508,14 @@ def study_port(exes):
     for code, what in (("LED_PIN", "WS2812 pin moved (4 -> 48)"),
                        ("CAN_TX_PIN", "TWAI TX pin moved (5 -> 17)"),
                        ("CAN_RX_PIN", "TWAI RX pin moved (6 -> 18)"),
-                       ("SENSOR_RAIL_OFF", "sensor rail is switched and off at reset")):
+                       ):
+        # There used to be a fourth: SENSOR_RAIL_OFF, "the sensor rail is
+        # switched and off at reset". It is not switched any more -- the
+        # supercap made shedding 80 mA pointless and GPIO16 went back to
+        # being spare -- so there is no longer a difference here for the
+        # R53 sketch to fall foul of. Removed rather than weakened: a check
+        # that cannot fail is worse than no check, because it reads as
+        # coverage.
         check(code in codes, "caught: " + what, "" if code in codes else "not detected")
     dark = all(row["leds_lit"] == 0 for row in r.rows)
     check(dark, "shift light is dark for the whole run on this board",
@@ -614,8 +651,11 @@ trace 20
 
 def study_ignition(exes, sketch, tag):
     head("8. Ignition off: the firmware contract in README section 2")
-    print("  On PWR_FAIL rising: drop SENS_EN, stop sampling, flush and close.")
+    print("  On PWR_FAIL rising: clear the strip, stop sampling, flush and close.")
     print("  Hardware guarantees the window; spending it is firmware's job.")
+    print("  Cut at 6500 rpm, with the strip lit. It used to be 3000, which is")
+    print("  exactly the shift point -- the strip was dark, so the run never")
+    print("  exercised the load-shed path it was supposed to be checking.")
     scn = """board autosport
 duration 3000
 trace 2
@@ -623,10 +663,10 @@ trace 2
 @0 sensorrail 1 5vs
 @0 canid 0x316
 @0 canrate 100
-@0 rpm 3000
+@0 rpm 6500
 @500 ble connect
 @600 ble subscribe 1
-@1500 vbat 0.0
+@1500 usb 0.0
 """
     r = Run("ignition_%s" % tag, exes[sketch], scn)
     show_faults(r)
@@ -738,15 +778,25 @@ trace 20
           "%.0f notifications sent into a client that never wrote the CCCD"
           % rn.rows[-1]["notifies"])
 
-    # The ISR drops SENS_EN itself, and that single register write is what
-    # separates the 154 ms window from the 75 ms one. Nothing asserted it.
-    ri, _codes = study_ignition(exes, "autosport", "sensen")
+    # This used to watch the ISR drop SENS_EN, the one register write that
+    # separated a 154 ms window from a 75 ms one. There is no sensor switch
+    # any more, so that check went on passing while watching a signal the
+    # board does not have -- gpio_with_role() returns -1 and the trace column
+    # reads 0 forever, which looks exactly like "shed immediately".
+    #
+    # The load that matters now is the shift light: eight WS2812s at full
+    # white is 480 mA against ~120 mA for the rest of the board, and the
+    # hold-up budget is inversely proportional to it. shutdown() clears the
+    # strip first for that reason, so that is what gets asserted.
+    ri, _codes = study_ignition(exes, "autosport", "shedleds")
     pf = float(ri.summary.get("PWR_FAIL_ms", "nan"))
-    shed = _first_time(ri, lambda row: row["sens_en"] == 0 and row["t_ms"] >= pf)
-    check(shed is not None and shed - pf <= 5.0,
-          "the sensor rail is shed within 5 ms of PWR_FAIL",
-          "shed at +%.1f ms -- this is what buys the 154 ms window instead of 75"
-          % ((shed - pf) if shed else float("nan")))
+    lit_at_pf = max([row["leds_lit"] for row in ri.rows if row["t_ms"] <= pf] or [0])
+    dark = _first_time(ri, lambda row: row["leds_lit"] == 0 and row["t_ms"] >= pf)
+    check(lit_at_pf > 0 and dark is not None and dark - pf <= 20.0,
+          "the shift light is cleared within 20 ms of PWR_FAIL",
+          "%d LEDs lit at the cut, dark at +%s ms -- this is what turns a "
+          "769 ms budget back into 2500 ms"
+          % (lit_at_pf, "%.1f" % (dark - pf) if dark is not None else "never"))
 
     # The shutdown path only runs during an ignition cut, so warnings raised
     # there -- dropping the card supply while the bus is still mounted, for one
@@ -758,18 +808,20 @@ trace 20
 
 
 def study_worst_case(exes):
-    head("12. The same ignition cut, on a flat battery")
-    print("  Every other firmware study runs against the 154 ms window study 4")
-    print("  measures with a healthy 13.5 V battery. That is not the case that")
-    print("  decides anything. Open the ignition with the harness already at the")
-    print("  11 V trip point and +VBAT starts its coast from 10.7 V, not 13.5 --")
-    print("  energy goes as V-squared, and gen/simulate.py's Monte Carlo puts")
-    print("  the 0.1% corner at 51 ms with caps -20% and load +40%.")
+    head("12. The same power cut, with the hold-up at its worst")
+    print("  The flat-battery corner this study used to run does not exist any")
+    print("  more: the board is powered from USB and the 12 V it can see is")
+    print("  OBD-II pin 16, which is permanent battery and does not switch off")
+    print("  with the ignition. What decides the outcome now is the supercap.")
+    print("  Three corners: everything shed, everything still running, and a")
+    print("  bank that has aged. EDLC capacitance falls and ESR rises over")
+    print("  life -- 30% down at end of life is a normal datasheet number, and")
+    print("  a car cabin is not a kind place to keep one.")
     print("    %-26s %10s %10s %9s" % ("window", "closed at", "collapse", "verdict"))
     rows = []
-    for label, shed, noshed in (("nominal, healthy battery", 154.4, 74.7),
-                                ("flat battery, median", 78.0, 38.0),
-                                ("flat battery, 0.1% corner", 51.0, 25.0)):
+    for label, shed, noshed in (("fresh bank, load shed", 2500.0, 769.0),
+                                ("fresh bank, nothing shed", 769.0, 769.0),
+                                ("aged bank -30%, nothing shed", 538.0, 538.0)):
         scn = f"""board autosport
 duration 2500
 trace 1
@@ -779,7 +831,7 @@ trace 1
 @0 canid 0x316
 @0 canrate 100
 @0 rpm 3000
-@1000 vbat 0.0
+@1000 usb 0.0
 """
         r = Run("worstcase_%d" % int(shed), exes["autosport"], scn)
         pf = float(r.summary.get("PWR_FAIL_ms", "nan"))
@@ -795,33 +847,33 @@ trace 1
                  "FILE LOST" if lost else "ok"))
     worst = rows[-1]
     check(not worst[5],
-          "the log survives an ignition cut on a flat battery at the 0.1% corner",
+          "the log survives a power cut on an aged bank with nothing shed",
           "file closed %s a %.0f ms window"
           % ("+%.0f ms into" % (worst[2] - worst[3]) if worst[2] else "never within", worst[1]))
     # How slow a card still fits inside the *worst-case* window, not the nominal.
-    print("\n  Card latency the 51 ms corner tolerates:")
+    print("\n  Card latency the 538 ms corner tolerates:")
     last_ok = None
-    for flush_ms in (10, 18, 25, 30, 35, 40, 50):
+    for flush_ms in (18, 50, 100, 200, 300, 400, 500, 600):
         scn = f"""board autosport
 duration 2500
 trace 1
 @0 vbat 13.8
 @0 sensorrail 1 5vs
-@0 budget 51 25
+@0 budget 538 538
 @0 sdflush {flush_ms}
 @0 canid 0x316
 @0 canrate 100
 @0 rpm 3000
-@1000 vbat 0.0
+@1000 usb 0.0
 """
         r = Run("worstflush_%03d" % flush_ms, exes["autosport"], scn)
         lost = "SD_OPEN_AT_POWER_LOSS" in set(r.codes())
         print("    %3d ms flush -> %s" % (flush_ms, "LOST" if lost else "closed"))
         if not lost:
             last_ok = flush_ms
-    check(last_ok is not None and last_ok >= 18,
-          "a healthy card (~18 ms flush) still fits the worst-case window",
-          "safe up to a %s ms flush against 130 ms on the nominal window"
+    check(last_ok is not None and last_ok >= 300,
+          "the worst-case window still swallows a card 15x slower than healthy",
+          "safe up to a %s ms flush, against ~18 ms for a healthy card"
           % last_ok)
     return rows
 
@@ -830,11 +882,15 @@ def study_flush_margin(exes):
     head("11. How slow can the card be before the file is lost?")
     print("  README section 2 says the shed path 'covers even a card that")
     print("  stalls'. This puts a number on that: the flush time is swept until")
-    print("  the close no longer fits inside the ride-through window.")
+    print("  the close no longer fits inside the hold-up window. The sweep runs")
+    print("  out to six seconds because the supercap made the old 300 ms top")
+    print("  end meaningless -- nothing failed, which reads as proof and is")
+    print("  really just a sweep that stopped too early.")
     print("    %10s %12s %14s" % ("flush time", "outcome", "closed at"))
     last_ok = None
     first_bad = None
-    for flush_ms in (18, 40, 60, 80, 100, 120, 130, 140, 150, 160, 200, 300):
+    for flush_ms in (18, 100, 300, 600, 1000, 1500, 2000, 2400, 2600, 3000,
+                     4000, 6000):
         scn = f"""board autosport
 duration 2000
 trace 2
@@ -844,7 +900,7 @@ trace 2
 @0 canid 0x316
 @0 canrate 100
 @0 rpm 3000
-@1000 vbat 0.0
+@1000 usb 0.0
 """
         r = Run("flush_%03d" % flush_ms, exes["autosport"], scn)
         lost = "SD_OPEN_AT_POWER_LOSS" in set(r.codes())
@@ -860,8 +916,8 @@ trace 2
     # A healthy card flushes in tens of milliseconds. Requiring the window to
     # survive 80 ms means it tolerates a card roughly four times slower than
     # that before the log is lost.
-    check(last_ok is not None and last_ok >= 80,
-          "the window tolerates a card ~4x slower than a healthy one",
+    check(last_ok is not None and last_ok >= 2000,
+          "the window tolerates a card ~100x slower than a healthy one",
           "still safe at a %d ms flush, against ~18 ms healthy" % (last_ok or 0))
     check(first_bad is not None,
           "and a slow enough card still does lose the file",
@@ -884,17 +940,29 @@ def study_crank(exes, sketch, tag):
         return None
     r = Run("crank_%s" % tag, exes[sketch], scn)
     lo = min(row["vbat"] for row in r.rows)
+    lo5 = min(row["v5"] for row in r.rows)
     edges = 0
     prev = 0
     for row in r.rows:
         if row["pwr_fail"] and not prev:
             edges += 1
         prev = row["pwr_fail"]
-    print("    cold-crank dip reaches %.2f V at the harness" % lo)
+    trip = 4.20
+    print("    cold-crank dip reaches %.2f V at the battery" % lo)
+    print("    the charger holds the 5 V rail down to %.2f V" % lo5)
     print("    PWR_FAIL edges during the crank: %d" % edges)
     print("    run ended: %s" % r.summary.get("stopped", "?"))
-    check(edges == 1, "PWR_FAIL asserts exactly once per crank",
-          "%d rising edges -- more than one is interrupt chatter" % edges)
+    # Data-driven, so this keeps meaning something if the crank trace or the
+    # charger model changes. Above the trip point the correct answer is that
+    # nothing happens at all; below it, exactly one edge and no chatter.
+    if lo5 > trip:
+        check(edges == 0,
+              "the charger rides the crank without asserting PWR_FAIL",
+              "rail bottomed at %.2f V against a %.2f V trip, %d edges"
+              % (lo5, trip, edges))
+    else:
+        check(edges == 1, "PWR_FAIL asserts exactly once per crank",
+              "%d rising edges -- more than one is interrupt chatter" % edges)
     check("collapsed" not in r.summary.get("stopped", ""),
           "the board rides the crank without the rails collapsing")
     return r

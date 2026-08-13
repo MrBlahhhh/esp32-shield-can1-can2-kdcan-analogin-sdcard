@@ -46,6 +46,7 @@ static Board make_s3zero() {
   b.has_pwr_fail = false;
   b.pwr_fail_trip = 0.0;
   b.pwr_fail_hyst = 0.0;
+  b.supply_floor = 0.0;
   b.ridethru_shed_ms = 20.0;   // a dev board's decoupling, nothing more
   b.ridethru_noshed_ms = 20.0;
   return b;
@@ -55,13 +56,17 @@ static Board make_autosport() {
   Board b;
   b.name = "autosport";
   const PinDef pins[] = {
-      {1,  ROLE_ANALOG_IN,   "AIN1",       R_5V, RAIL_5VS},
-      {2,  ROLE_ANALOG_IN,   "AIN2",       R_5V, RAIL_5VS},
-      {4,  ROLE_ANALOG_IN,   "AIN3",       R_5V, RAIL_5VS},
-      {5,  ROLE_ANALOG_IN,   "AIN4",       R_5V, RAIL_5VS},
-      {6,  ROLE_VBAT_SNS,    "VBAT_SNS",   1.0 / 11.0, RAIL_NONE},
-      {7,  ROLE_SD_PWR_EN,   "SD_PWR_EN",  0.0, RAIL_NONE},
-      {8,  ROLE_SD_CD,       "SD_CD",      0.0, RAIL_NONE},
+      {4,  ROLE_ANALOG_IN,   "AIN1",       R_5V, RAIL_5VS},
+      {5,  ROLE_ANALOG_IN,   "AIN2",       R_5V, RAIL_5VS},
+      {6,  ROLE_ANALOG_IN,   "AIN3",       R_5V, RAIL_5VS},
+      {7,  ROLE_ANALOG_IN,   "AIN4",       R_5V, RAIL_5VS},
+      // 8.2k / 108.2k, not the 1/11 this model used to carry. The schematic
+      // moved to 13.2:1 so a 36 V input would not saturate the ADC, and the
+      // model did not follow -- study 0 compares NETS, not ratios, so it
+      // could not see the drift.
+      {8,  ROLE_VBAT_SNS,    "VBAT_SNS",   8.2 / 108.2, RAIL_NONE},
+      {40, ROLE_SD_PWR_EN,   "SD_PWR_EN",  0.0, RAIL_NONE},
+      {21, ROLE_SD_CD,       "SD_CD",      0.0, RAIL_NONE},
       {9,  ROLE_SD_BUS,      "SD_D3",      0.0, RAIL_NONE},
       {10, ROLE_SD_BUS,      "SD_D2",      0.0, RAIL_NONE},
       {11, ROLE_SD_BUS,      "SD_D1",      0.0, RAIL_NONE},
@@ -69,30 +74,23 @@ static Board make_autosport() {
       {13, ROLE_SD_BUS,      "SD_CMD",     0.0, RAIL_NONE},
       {14, ROLE_SD_BUS,      "SD_CLK",     0.0, RAIL_NONE},
       {15, ROLE_PWR_FAIL,    "PWR_FAIL",   0.0, RAIL_NONE},
-      {16, ROLE_SENS_EN,     "SENS_EN",    0.0, RAIL_NONE},
       {17, ROLE_CAN_TX,      "CAN_TX",     0.0, RAIL_NONE},
       {18, ROLE_CAN_RX,      "CAN_RX",     0.0, RAIL_NONE},
-      {19, ROLE_USB,         "USB_DM",     0.0, RAIL_NONE},
-      {20, ROLE_USB,         "USB_DP",     0.0, RAIL_NONE},
-      {21, ROLE_CAN_S,       "CAN_S",      0.0, RAIL_NONE},
-      {0,  ROLE_BOOT,        "MCU_BOOT",   0.0, RAIL_NONE},
+      {16, ROLE_CAN_S,       "CAN_S",      0.0, RAIL_NONE},
       // Net names, not header positions -- gen/simulate_firmware.py study 0
       // diffs this table against netlist.txt and needs the same vocabulary.
-      {3,  ROLE_SPARE_STRAP, "IO3",        0.0, RAIL_NONE},
-      {45, ROLE_SPARE_STRAP, "IO45",       0.0, RAIL_NONE},
-      {46, ROLE_SPARE_STRAP, "IO46",       0.0, RAIL_NONE},
       {35, ROLE_PSRAM,       "PSRAM",      0.0, RAIL_NONE},
       {36, ROLE_PSRAM,       "PSRAM",      0.0, RAIL_NONE},
       {37, ROLE_PSRAM,       "PSRAM",      0.0, RAIL_NONE},
-      {38, ROLE_I2C_SDA,     "I2C_SDA",    0.0, RAIL_NONE},
+      // IO38 drives the DevKitC-1 v1.1 onboard RGB LED, so SDA moved to IO47.
+      {47, ROLE_I2C_SDA,     "I2C_SDA",    0.0, RAIL_NONE},
       {39, ROLE_I2C_SCL,     "I2C_SCL",    0.0, RAIL_NONE},
-      {40, ROLE_SPI,         "SPI_SCK",    0.0, RAIL_NONE},
-      {41, ROLE_SPI,         "SPI_MISO",   0.0, RAIL_NONE},
-      {42, ROLE_SPI,         "SPI_MOSI",   0.0, RAIL_NONE},
-      {43, ROLE_UART,        "UART_TX",    0.0, RAIL_NONE},
-      {44, ROLE_UART,        "UART_RX",    0.0, RAIL_NONE},
-      {47, ROLE_SPI,         "SPI_CS",     0.0, RAIL_NONE},
       {48, ROLE_WS2812_DIN,  "LED_DIN_MCU", 0.0, RAIL_NONE},
+      // K-line. The pins are modelled so study 0 holds them against the
+      // netlist and the sketch can drive them; there is no KWP2000 protocol
+      // model behind them yet.
+      {41, ROLE_KLINE_TX,    "K_TX",       0.0, RAIL_NONE},
+      {42, ROLE_KLINE_RX,    "K_RX",       0.0, RAIL_NONE},
   };
   b.pins.assign(pins, pins + sizeof(pins) / sizeof(pins[0]));
   b.adc_fullscale = 3.10;
@@ -100,15 +98,25 @@ static Board make_autosport() {
   b.adc_bits = 12;
   b.ws2812_buffered = true;      // 74AHCT1G125, input floats until driven
   b.has_pwr_fail = true;
-  b.pwr_fail_trip = 11.0;        // README section 2
-  b.pwr_fail_hyst = 0.3;
-  // Measured by gen/simulate.py study 4 on the 760 uF bank, ignition opened
-  // on a healthy 13.5 V battery. Note this is the *nominal* window: study 8's
-  // Monte Carlo runs the same event with the harness already down at the trip
-  // point (a flat battery) and worst-case tolerances, and gets 51 ms. Anything
-  // this simulator concludes about flush margin is a nominal-case claim.
-  b.ridethru_shed_ms = 154.4;    // sim/ridethru_shed.dat
-  b.ridethru_noshed_ms = 74.7;   // sim/ridethru_noshed.dat
+  // The board runs off USB now, so the rail being watched is the dev board's
+  // 5 V pin, not a 12 V harness. Trip is the TLV431 divider: 1.24 * 40.7/12.0.
+  b.pwr_fail_trip = 4.20;
+  b.pwr_fail_hyst = 0.10;
+  b.supply_floor = 3.60;         // DevKitC-1 LDO dropout at ~120 mA
+  // Hold-up is a 0.5 F supercapacitor bank (2 x 1 F 2.7 V in series) on the
+  // 5 V rail, discharging through a Schottky into the dev board.
+  //
+  //   t = C * dV / I,  dV = 4.2 (trip) - 3.6 (LDO dropout) = 0.6 V
+  //     shed   120 mA (radio down, LEDs dark)  -> 0.5 * 0.6 / 0.120 = 2500 ms
+  //     noshed 390 mA (radio, LEDs, sensors)   -> 0.5 * 0.6 / 0.390 =  769 ms
+  //
+  // TODO these two are hand-calculated, unlike the 154.4/74.7 they replace,
+  // which came out of gen/simulate.py study 4. The equivalent ngspice study
+  // for the supercap bank has not been written yet, so treat them as an
+  // estimate rather than a measurement -- an ESR term and the Schottky's
+  // forward drop over temperature will both eat into them.
+  b.ridethru_shed_ms = 2500.0;
+  b.ridethru_noshed_ms = 769.0;
   return b;
 }
 
@@ -127,6 +135,8 @@ const char* role_name(Role r) {
     case ROLE_SD_BUS: return "microSD bus";
     case ROLE_PWR_FAIL: return "power-fail interrupt";
     case ROLE_SENS_EN: return "sensor-rail enable";
+    case ROLE_KLINE_TX: return "K-line transmit";
+    case ROLE_KLINE_RX: return "K-line receive";
     case ROLE_USB: return "native USB";
     case ROLE_UART: return "UART0";
     case ROLE_SPI: return "SPI breakout";
@@ -200,7 +210,8 @@ struct State {
   BleHooks hooks;
 
   // power
-  double vbat;
+  double vbat;     // OBD-II pin 16, permanent battery. Sense only.
+  double v5;       // the dev board's 5 V pin: what actually powers the board
   bool pwr_fail;
   bool pwr_fail_observed;
   double pwr_fail_at_ms;
@@ -263,7 +274,7 @@ State& S() {
     s.ble_init_ok = true; s.ble_up = s.ble_adv = s.ble_conn = s.ble_sub = false;
     s.notifies = 0; s.last_notify = 0.0f;
     memset(&s.hooks, 0, sizeof s.hooks);
-    s.vbat = 13.8; s.pwr_fail = false; s.pwr_fail_observed = false;
+    s.vbat = 13.8; s.v5 = 4.70; s.pwr_fail = false; s.pwr_fail_observed = false;
     s.pwr_fail_at_ms = -1.0; s.reserve = 1.0; s.lost = false;
     s.budget_shed_ms = 0.0; s.budget_noshed_ms = 0.0;
     s.sd_begun = false;
@@ -402,13 +413,20 @@ void step(uint64_t dt_us) {
   State& s = S();
   s.t_us += dt_us;
 
-  // Power: below the converters' input floor the board runs off the cap bank,
-  // and how long that lasts depends on whether firmware shed the sensor rail.
+  // Power: below the TLV431 trip point the board is running off the supercap
+  // bank, and how long that lasts depends on what firmware has switched off.
+  //
+  // The parent could watch a node the bank did not hold up -- it sensed ahead
+  // of its ideal diode -- so it saw the harness open before spending any of
+  // the ride-through. There is no such node here: USB VBUS is not brought out
+  // on the DevKitC-1, so PWR_FAIL and the bank both sit on the 5 V rail and
+  // the first part of the window is spent before anything notices. That only
+  // became affordable when the budget went from 127 ms to seconds.
   const Board& b = board();
   if (b.has_pwr_fail) {
     bool was = s.pwr_fail;
-    if (s.vbat < b.pwr_fail_trip) s.pwr_fail = true;
-    else if (s.vbat > b.pwr_fail_trip + b.pwr_fail_hyst) s.pwr_fail = false;
+    if (s.v5 < b.pwr_fail_trip) s.pwr_fail = true;
+    else if (s.v5 > b.pwr_fail_trip + b.pwr_fail_hyst) s.pwr_fail = false;
     if (s.pwr_fail && !was) {
       s.pwr_fail_at_ms = s.t_us / 1000.0;
       int pin = gpio_with_role(ROLE_PWR_FAIL);
@@ -419,10 +437,16 @@ void step(uint64_t dt_us) {
       }
     }
   }
-  if (s.vbat < 6.0) {   // LM74700 UVLO / LM5164 dropout: the harness is gone
+  if (s.v5 < b.pwr_fail_trip) {   // USB is gone; the bank is carrying it
     double shed = s.budget_shed_ms > 0 ? s.budget_shed_ms : b.ridethru_shed_ms;
     double noshed = s.budget_noshed_ms > 0 ? s.budget_noshed_ms : b.ridethru_noshed_ms;
-    double budget_ms = sens_rail_live() ? noshed : shed;
+    // What is worth shedding changed with the supply. On the parent it was
+    // the sensor rail, 80 mA out of ~350 mA at 12 V, switched by SENS_EN.
+    // There is no switch now, and the load that dominates is the shift light:
+    // eight WS2812s at full white is 480 mA against ~120 mA for everything
+    // else. So the budget turns on whether the strip is dark, which is the
+    // first thing shutdown() does.
+    double budget_ms = (s.led_lit > 0) ? noshed : shed;
     s.reserve -= (dt_us / 1000.0) / budget_ms;
     if (s.reserve <= 0.0 && !s.lost) {
       s.reserve = 0.0;
@@ -879,11 +903,13 @@ void ble_event_hwmode(uint8_t v) {
 // Power and sensors
 
 void power_set_vbat(double v) { S().vbat = v; }
+void power_set_v5(double v) { S().v5 = v; }
 void power_set_budget(double shed_ms, double noshed_ms) {
   S().budget_shed_ms = shed_ms;
   S().budget_noshed_ms = noshed_ms;
 }
 double power_vbat() { return S().vbat; }
+double power_v5() { return S().v5; }
 bool power_failed() { return S().pwr_fail; }
 double power_reserve() { return S().reserve; }
 bool power_lost() { return S().lost; }
@@ -1016,8 +1042,9 @@ void trace_emit() {
   const char* ble = !s.ble_up ? "down" : (s.ble_sub ? "subscribed" : (s.ble_conn ? "connected" : (s.ble_adv ? "advertising" : "idle")));
   int sens = gpio_with_role(ROLE_SENS_EN);
   fprintf(s.trace,
-          "%.3f,%.3f,%d,%d,%.1f,%lu,%lu,%lu,%d,%d,%d,%d,%lu,%lu,%.4f,%s,%d,%d,%u,%.4f\n",
+          "%.3f,%.3f,%.3f,%d,%d,%.1f,%lu,%lu,%lu,%d,%d,%d,%d,%lu,%lu,%.4f,%s,%d,%d,%u,%.4f\n",
           s.t_us / 1000.0,
+          s.v5,
           s.vbat,
           s.pwr_fail ? 1 : 0,
           (sens >= 0 && s.level.count(sens)) ? s.level[sens] : 0,
@@ -1040,7 +1067,7 @@ void trace_open(const std::string& path) {
   s.trace = fopen(path.c_str(), "w");
   if (!s.trace) return;
   fprintf(s.trace,
-          "t_ms,vbat,pwr_fail,sens_en,cmd_rpm,can_generated,can_delivered,can_dropped,"
+          "t_ms,v5,vbat,pwr_fail,sens_en,cmd_rpm,can_generated,can_delivered,can_dropped,"
           "leds_lit,led_r,led_g,led_b,led_frames,notifies,notify_v,ble,adc_mv,"
           "sd_open,sd_unflushed,reserve\n");
   s.trace_next_us = 0;
@@ -1090,10 +1117,14 @@ void apply_event(const std::vector<std::string>& a) {
     if (ch >= 1 && ch < 9) S().chan_ratio[ch] = v;
   }
   else if (c == "vbat") power_set_vbat(num(a, 1, 13.8));
+  // "usb 0" is what an ignition-off looks like now. "vbat 0" is unplugging
+  // the OBD lead, which kills CAN, K-line and the battery reading but leaves
+  // the board running -- a genuinely different event, and now a separate one.
+  else if (c == "usb") power_set_v5(num(a, 1, 4.70));
   else if (c == "ads") ads_set_present(num(a, 1, 1) != 0);
   else if (c == "sdstall") sd_set_stalled(num(a, 1, 1) != 0);
   else if (c == "sdflush") sd_set_flush_ms(num(a, 1, 18));
-  else if (c == "budget") power_set_budget(num(a, 1, 152), num(a, 2, 75));
+  else if (c == "budget") power_set_budget(num(a, 1, 2500), num(a, 2, 769));
   else if (c == "ble") {
     const std::string& w = a.size() > 1 ? a[1] : std::string();
     if (w == "connect") ble_event_connect();
