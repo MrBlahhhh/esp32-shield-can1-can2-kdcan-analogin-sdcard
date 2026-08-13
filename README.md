@@ -95,7 +95,8 @@ Every one of the 49 fab BOM lines carries an LCSC part number, and each was
 checked against the live catalogue rather than assumed — see
 [`docs/PARTS.md`](docs/PARTS.md) for what that turned up, including three
 part numbers that were confidently wrong and two footprints that would not
-have soldered.
+have soldered. [`docs/COST.md`](docs/COST.md) prices the result and identifies
+about $5.70 a board of savings that cost nothing functional.
 
 `fab/order-elsewhere.csv` lists what LCSC's assembly flow cannot supply:
 the through-hole connectors, the two supercapacitors and the dev board.
