@@ -31,23 +31,75 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ = os.path.abspath(os.path.join(HERE, ".."))
 
-# Rough glyph box. KiCad's default schematic text is 1.27 mm; the generator
-# shrinks some of it. Width per character is about 0.7 of the height for the
-# stroke font, and this only has to be good enough to catch overlaps.
-CHAR_W = 0.70
+# Glyph box. KiCad's default schematic text is 1.27 mm; the generator shrinks
+# some of it.
+#
+# 0.85 is measured, not guessed. Plotting the whole schematic to PDF and
+# taking the extent of all 1141 horizontal strings KiCad drew gives a median
+# advance of 0.851 x size, mean 0.855. The 0.70 this started with was an
+# eyeballed figure and it understated every string by a sixth -- an 10-
+# character net label came out 8.9 mm wide against the 12.1 mm KiCad actually
+# plots, which is enough to miss a collision three characters deep.
+#
+# Height stays at exactly `size`, because in KiCad the text size IS the cap
+# height. The PDF reports a 2.43 mm box for 1.27 mm text, but that is the
+# ascent-plus-descent of the font the viewer substituted, not the ink.
+CHAR_W = 0.85
 LINE_H = 1.30
+
+
+def _blocks(src, start, token):
+    """Yield (name, body) for each `(token "name" ...)` at the top level of
+    src[start:], by matching brackets rather than counting indentation."""
+    i, depth = start, 0
+    while i < len(src):
+        c = src[i]
+        if c == "(":
+            if depth == 1 and src.startswith(token, i + 1):
+                m = re.match(r'\(%s "([^"]*)"' % token, src[i:])
+                if m:
+                    j, d = i, 0
+                    while j < len(src):
+                        if src[j] == "(":
+                            d += 1
+                        elif src[j] == ")":
+                            d -= 1
+                            if d == 0:
+                                break
+                        j += 1
+                    yield m.group(1), src[i:j + 1]
+                    # Skip the whole block. Depth is untouched because every
+                    # bracket inside it has been stepped over, not counted.
+                    i = j + 1
+                    continue
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return
+        i += 1
 
 
 def lib_info(src):
     """Per library symbol: whether pin numbers are drawn, and where the pins
     are. Pin numbers are the text most likely to collide with something,
-    because KiCad draws them wherever the pin is and nothing moves them."""
+    because KiCad draws them wherever the pin is and nothing moves them.
+
+    The pins live one level down, in the `NAME_1_1` unit sub-symbols, but the
+    placed symbols on the sheet refer to the PARENT by its full lib_id. The
+    first version of this keyed the table on the unit names, so every lookup
+    from the sheet missed, every symbol came back with an empty pin list, and
+    the pin-number collisions this function exists to find were never once
+    tested. It reported clean because it never looked.
+    """
     info = {}
-    for m in re.finditer(r'\n\t\t\(symbol "([^"]+)"\n(.*?)\n\t\t\)\n', src, re.S):
-        name, body = m.group(1), m.group(2)
-        if "/" in name or name.count("_") > 90:
-            continue
-        hidden = "(pin_numbers" in body and "(hide yes)" in body.split("(pin_names")[0]
+    root = src.find("(lib_symbols")
+    if root < 0:
+        return info
+    for name, body in _blocks(src, root, "symbol"):
+        # `(pin_numbers (hide yes))` on the parent hides them for every unit.
+        head = body.split("(symbol ", 1)[0]
+        hidden = "(pin_numbers" in head and "(hide yes)" in head.split("(pin_names")[0]
         pins = []
         for q in re.finditer(
                 r'\(pin \w+ \w+\s*\(at ([-\d.]+) ([-\d.]+) ([-\d.]+)\)'
@@ -96,6 +148,39 @@ def text_box(val, x, y, angle, size=1.27, justify=""):
     return (x0, y0, x1, y1)
 
 
+def symbol_spans(src):
+    """(start, end, rotation) for every placed symbol block.
+
+    A property's `(at x y a)` angle is stored RELATIVE to the symbol it
+    belongs to -- KiCad adds the symbol's own rotation before drawing. The
+    generator writes 270 on the fields of a part rotated 90 precisely so the
+    text comes out horizontal, and reading that 270 on its own says the text
+    is vertical. Every field on every rotated part was modelled as a tall
+    narrow box instead of a long flat one, which is how "SMAJ26CA" and "TERM"
+    came to be printed through each other with the audit reporting clean.
+    """
+    spans = []
+    for m in re.finditer(
+            r'\(symbol\s*\(lib_id "[^"]*"\)\s*\(at [-\d.]+ [-\d.]+ ([-\d.]+)\)', src):
+        i, depth = m.start(), 0
+        while i < len(src):
+            if src[i] == "(":
+                depth += 1
+            elif src[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        spans.append((m.start(), i, float(m.group(1))))
+    return spans
+
+
+def owner_rotation(spans, pos):
+    for s, e, theta in spans:
+        if s <= pos <= e:
+            return theta
+    return 0.0
+
 def sheets():
     for name in sorted(os.listdir(PROJ)):
         if name.endswith(".kicad_sch"):
@@ -124,6 +209,7 @@ def parse(path):
             i += 1
         src = src[:start] + src[i + 1:]
 
+    spans = symbol_spans(src)
     texts, symbols, wires = [], [], []
 
     # The generator writes compact s-expressions and KiCad's own libraries
@@ -156,15 +242,26 @@ def parse(path):
         if sm:
             size = float(sm.group(1))
         jm = re.search(r"\(justify ([a-z ]+)\)", head)
-        texts.append((key, val) + text_box(val, float(x), float(y), float(_r),
+        # Effective angle: the symbol's rotation plus the field's own.
+        eff = float(_r) + owner_rotation(spans, m.start())
+        texts.append((key, val) + text_box(val, float(x), float(y), eff,
                                            size, jm.group(1) if jm else ""))
 
     for m in re.finditer(
             r'\(symbol\s*\(lib_id "([^"]*)"\)\s*\(at ([-\d.]+) ([-\d.]+) ([-\d.]+)\)', src):
         lib_id, sx, sy, theta = (m.group(1), float(m.group(2)),
                                  float(m.group(3)), float(m.group(4)))
-        symbols.append((lib_id, sx, sy))
+        rm = re.search(r'\(property "Reference" "([^"]*)"', src[m.end():m.end() + 400])
+        ref = rm.group(1) if rm else lib_id
         hidden, pins = libs.get(lib_id, (True, []))
+        # Pin ends in sheet coordinates. KiCad stores a pin's anchor at its
+        # connection point, so this is exactly where a wire has to land.
+        import math as _m
+        ends = []
+        for px, py, ang, ln, num in pins:
+            ox, oy = rot(-theta, px, -py)
+            ends.append((sx + ox, sy + oy))
+        symbols.append((lib_id, sx, sy, ref, ends))
         if hidden:
             continue
         for px, py, ang, ln, num in pins:
@@ -195,14 +292,74 @@ def parse(path):
     return texts, symbols, wires
 
 
-def near_wire(x, y, wires, tol=2.6):
-    """Is (x, y) on or near the end of any wire? Pins sit on wire ends."""
-    for x1, y1, x2, y2 in wires:
-        if abs(x1 - x) <= tol and abs(y1 - y) <= tol:
-            return True
-        if abs(x2 - x) <= tol and abs(y2 - y) <= tol:
-            return True
+def key(x, y):
+    return (round(x, 2), round(y, 2))
+
+
+def on_segment(px, py, seg, eps=0.02):
+    """Does (px, py) lie on axis-aligned segment seg? A wire ending in the
+    middle of another wire is a junction, and the two are one conductor."""
+    x1, y1, x2, y2 = seg
+    if abs(x1 - x2) < eps:
+        return abs(px - x1) < eps and min(y1, y2) - eps <= py <= max(y1, y2) + eps
+    if abs(y1 - y2) < eps:
+        return abs(py - y1) < eps and min(x1, x2) - eps <= px <= max(x1, x2) + eps
     return False
+
+
+def wire_groups(wires):
+    """Union-find over wire endpoints. Returns {point: group id}."""
+    parent = {}
+
+    def find(a):
+        parent.setdefault(a, a)
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for x1, y1, x2, y2 in wires:
+        union(key(x1, y1), key(x2, y2))
+    # A wire that stops on another wire's body is joined to it.
+    pts = list(parent)
+    for px, py in pts:
+        for seg in wires:
+            if on_segment(px, py, seg):
+                union((px, py), key(seg[0], seg[1]))
+    return {p: find(p) for p in parent}
+
+
+def label_only(symbols, wires):
+    """Symbols joined to no other symbol by drawn wire.
+
+    A symbol with no pins at all -- a mounting hole, a logo, a fiducial --
+    is not connectivity and is not counted either way.
+    """
+    groups = wire_groups(wires)
+    owner = {}
+    for ref, lib_id, pins in symbols:
+        for px, py in pins:
+            g = groups.get(key(px, py))
+            if g is not None:
+                owner.setdefault(g, set()).add(ref)
+    loose = []
+    for ref, lib_id, pins in symbols:
+        if not pins:
+            continue
+        joined = False
+        for px, py in pins:
+            g = groups.get(key(px, py))
+            if g is not None and len(owner.get(g, ())) > 1:
+                joined = True
+                break
+        if not joined:
+            loose.append((ref, lib_id))
+    return loose
 
 
 def main():
@@ -226,20 +383,19 @@ def main():
                                    % (_k1[:9], v1[:14], _k2[:9], v2[:14],
                                       (ax1 + ax2) / 2, (ay1 + ay2) / 2))
 
-        # A symbol is "loose" if no wire end lands anywhere near its origin.
-        # Crude, but it separates the wired blocks from the shelf-packed
-        # parts that are held together only by net labels.
-        loose = [s for s in symbols
-                 if not s[0].startswith("power:")
-                 and not near_wire(s[1], s[2], wires, tol=12.0)]
+        real = [(sym[3], sym[0], sym[4]) for sym in symbols
+                if not sym[0].startswith("power:")]
+        loose = label_only(real, wires)
 
         total_overlap += len(clashes)
-        total_sym += len([s for s in symbols if not s[0].startswith("power:")])
+        total_sym += len([sym for sym in real if sym[2]])
         total_loose += len(loose)
         print("  %-26s %3d symbols  %3d wires  %3d text clashes  %3d unwired"
               % (name, len(symbols), len(wires), len(clashes), len(loose)))
         for c in clashes[:6]:
             print("        clash: %s" % c)
+        for ref, lib_id in loose[:6]:
+            print("        label-only: %-6s %s" % (ref, lib_id))
 
     print("\n  %d text clashes, %d of %d symbols unwired (%.0f%%)"
           % (total_overlap, total_loose, total_sym,

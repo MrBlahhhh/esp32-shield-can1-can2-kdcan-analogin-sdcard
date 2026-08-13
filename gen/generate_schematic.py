@@ -375,6 +375,23 @@ def wire_pairs(sh):
     return out
 
 
+def justify_for(angle):
+    """Which side of its anchor a label's text runs, given its rotation.
+
+    Measured, not assumed: plotting the sheets and reading back the extent of
+    every label KiCad drew gives one rule -- `justify left` puts the text to
+    the RIGHT of the anchor and `justify right` puts it to the LEFT, at
+    rotation 0 and 180 alike. The rotation does not flip the justification.
+
+    So a label at 180 needs `right` to run its text away from the wire it
+    came in on. Eight were emitted with a hardcoded `left` from the block
+    tables and ran backwards over the very part they named: "AGND_SENSE"
+    printed through the ADS1115's pin 1, "I2C_SDA" and "I2C_SCL" through the
+    socket pins beside them.
+    """
+    return "right" if int(angle) % 360 in (180, 270) else "left"
+
+
 def label_rotation(direction):
     return {(1, 0): 0, (-1, 0): 180, (0, -1): 90, (0, 1): 270}[direction]
 
@@ -1549,7 +1566,7 @@ def assign_refs():
 
 PAGE_W, PAGE_H = 594.0, 297.0   # A2 width, A3 height: sheets grow sideways
 MARGIN_X, MARGIN_TOP, MARGIN_BOT = 12.0, 18.0, 22.0
-STUB = 5.08
+STUB = 7.62
 LABEL_ALLOWANCE = 15.0   # rails are power symbols and pairs are wired now
 # Breathing room. The packer used to fill each column to the bottom of the
 # page before starting the next, which reads as a dense stripe down the left
@@ -2200,7 +2217,7 @@ def crossing_nets(sh):
 
 LOCAL_LABEL = (
     '  (label "%s" (at %s %s %d)\n'
-    "    (effects (font (size 1.27 1.27)) (justify left bottom))\n"
+    "    (effects (font (size 1.27 1.27)) (justify %s bottom))\n"
     "    (uuid %s)\n  )"
 )
 
@@ -2307,20 +2324,22 @@ def emit_sheet(libs, sh, sheet_uuid, page):
             uid = det_uuid("bl:%s:%s" % (sh["file"], net))
             if not elsewhere:
                 labels.append(LOCAL_LABEL
-                              % (net, mm(ax + lx), mm(ay + ly), ang, uid))
+                              % (net, mm(ax + lx), mm(ay + ly), ang,
+                                 justify_for(ang), uid))
             elif net in crossing:
                 labels.append(HIER_LABEL % (net, "bidirectional", mm(ax + lx),
-                                            mm(ay + ly), ang, "left", uid))
+                                            mm(ay + ly), ang, justify_for(ang),
+                                            uid))
             else:
                 labels.append(
                     '  (global_label "%s" (shape input) (at %s %s %d) (fields_autoplaced)\n'
-                    "    (effects (font (size 1.27 1.27)) (justify left))\n"
+                    "    (effects (font (size 1.27 1.27)) (justify %s))\n"
                     "    (uuid %s)\n"
                     '    (property "Intersheet References" "${INTERSHEET_REFS}" (at %s %s 0)\n'
                     "      (effects (font (size 1.27 1.27)) (justify left) hide)\n"
                     "    )\n  )"
-                    % (net, mm(ax + lx), mm(ay + ly), ang, uid,
-                       mm(ax + lx), mm(ay + ly)))
+                    % (net, mm(ax + lx), mm(ay + ly), ang, justify_for(ang),
+                       uid, mm(ax + lx), mm(ay + ly)))
         # A rail pin the block wired up has lost its own power symbol, so the
         # block says where the rail enters instead: the inductor and the
         # feedback divider share one +5 V symbol on the output node, which is
@@ -2361,7 +2380,7 @@ def emit_sheet(libs, sh, sheet_uuid, page):
             # The anchor has to sit exactly on the wire or KiCad treats the
             # label as floating; "left bottom" lifts the text clear instead.
             LOCAL_LABEL % (info["net"], mm(hx + (sx - hx) * 0.18),
-                           mm(hy + (sy - hy) * 0.18), 0,
+                           mm(hy + (sy - hy) * 0.18), 0, justify_for(0),
                            det_uuid("wlbl:%s:%s" % (sh["file"], ref))))
         joined.add((info["host"], info["host_pin"]))
         joined.add((ref, info["sat_pin"]))

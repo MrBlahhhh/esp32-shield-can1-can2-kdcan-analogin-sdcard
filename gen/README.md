@@ -11,7 +11,7 @@ way, so the next boards can reuse all of it. The intended flow for a new design 
 
 ```
 # schematic loop (any Python 3)
-python gen/generate_schematic.py && python gen/validate.py
+python gen/generate_schematic.py && python gen/tidy_sch_text.py \n  && python gen/validate.py && python gen/audit_schematic.py
 
 # board loop (needs KiCad 9 installed, freerouting.jar in the repo root)
 python -u gen/build_board.py --passes 60
@@ -38,6 +38,8 @@ python gen/export_plots.py        # schematic.pdf + three board renders
 | `stitch_planes.py` | a via from every GND/+3V3 pad to its plane, with hole-collision checks |
 | `maze_route.py` | rip-up-and-retry router for whatever freerouting leaves open |
 | `tidy_silk.py` | reference designator declutter; touches no copper |
+| `tidy_sch_text.py` | the same job on the schematic: nudges colliding references and values, slides labels along their own wire, pulls a stub out where a label needs room. Touches no connectivity |
+| `audit_schematic.py` | measures what tidy_sch_text.py then fixes — text collisions (including pin numbers) and symbols joined by name rather than by wire |
 | `validate.py` | compares KiCad's own netlist node-for-node against `netlist.txt`, runs ERC |
 | `audit_pcb.py` | current capacity, antenna keepout, decoupling distance, thermal, drill overlaps |
 | `simulate.py` | twelve ngspice/numpy/scipy studies of the circuits themselves |
