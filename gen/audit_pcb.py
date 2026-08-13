@@ -15,6 +15,7 @@ physical rather than electrical:
                         decoration
   4. thermal            dissipation per part against the copper it sits on
   5. pin coverage       every symbol pin has a pad to land on
+  6. card slot          a socket's mouth has to face off the board
   6. courtyard overlap  a screen for parts stacked on each other
 
 Currents come from RAIL_CURRENT below, which is design intent, not
@@ -184,6 +185,54 @@ def main():
           % (len(seen), len(clashes)))
     for c in clashes[:6]:
         print("      " + c)
+
+    # ------------------------------------------------ 6. card slot faces out ----
+    head("7. Card slots face a board edge")
+    # A microSD card goes in contacts-first, so the socket's spring contacts
+    # -- and the tails that solder to the numbered pads -- are at the BACK of
+    # the slot. The mouth is therefore opposite the pads, and it has to face
+    # off the board or the card cannot be inserted at all.
+    #
+    # This board shipped a revision with the socket at 0 degrees, mouth
+    # pointing into the laminate. Nothing caught it: the netlist is identical
+    # either way, DRC has no opinion about which way a connector faces, and
+    # the fab layer's outline on the pad side reads like a card if you want
+    # it to. The pads are the evidence, so this measures the pads.
+    bx = board.GetBoardEdgesBoundingBox()
+    bl, br_, bt, bb = (bx.GetLeft() / 1e6, bx.GetRight() / 1e6,
+                       bx.GetTop() / 1e6, bx.GetBottom() / 1e6)
+    slots = 0
+    for fp in board.GetFootprints():
+        # The library nickname comes back empty on a loaded board, so match on
+        # the footprint name alone.
+        name = str(fp.GetFPID().GetLibItemName()).lower()
+        if "microsd" not in name and "sd_card" not in name:
+            continue
+        slots += 1
+        cx = fp.GetPosition().x / 1e6
+        cy = fp.GetPosition().y / 1e6
+        pads = [p for p in fp.Pads() if p.GetNumber().isdigit()
+                and int(p.GetNumber()) <= 8]
+        if not pads:
+            continue
+        px = sum(p.GetPosition().x / 1e6 for p in pads) / len(pads)
+        py = sum(p.GetPosition().y / 1e6 for p in pads) / len(pads)
+        # Mouth points away from the contact block.
+        mx, my = cx - (px - cx), cy - (py - cy)
+        dx, dy = mx - cx, my - cy
+        if abs(dx) >= abs(dy):
+            edge, gap = ("right", br_ - cx) if dx > 0 else ("left", cx - bl)
+        else:
+            edge, gap = ("bottom", bb - cy) if dy > 0 else ("top", cy - bt)
+        ok = gap < 12.0
+        print("    %s %-5s mouth faces %-6s %5.1f mm of board that way"
+              % ("ok  " if ok else "FAR ", fp.GetReference(), edge, gap))
+        if not ok:
+            fails.append("%s: card slot mouth faces %s with %.0f mm of board "
+                         "in the way -- the card cannot be inserted"
+                         % (fp.GetReference(), edge, gap))
+    if not slots:
+        print("    no card sockets on this board")
 
     # -------------------------------------------------- 2. antenna keepout ----
     head("2. ESP32 antenna keepout")

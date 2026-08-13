@@ -192,7 +192,17 @@ FIXED = {
     # the note on the connectors in gen/generate_schematic.py.
     "value:CAN1 + power harness": (4.0, 66.0, 90),   # left edge, by U5
     "value:Aux bus harness":      (68.0, 6.5, 0),    # top right, by U6/U7
-    "Hirose DM3D-SF":           (17.0, 87.0, 0),    # bottom edge, card out
+    # 180 degrees, and the tell is the solder joints. A microSD card is
+    # inserted contacts-first, so the socket's spring contacts -- and the
+    # tails that solder to these pads -- are at the BACK of the slot, and the
+    # mouth is at the opposite end. Pads 1-8 sit at footprint y +5.35, so at
+    # 0 degrees the mouth faces -y, which on this board pointed INTO the
+    # laminate: the card could only have been inserted from inside the PCB.
+    #
+    # I got this wrong first time by reading the U-shaped outline on the fab
+    # layer at +y as the card. It is not the card, it is the contact block.
+    # The pads are the evidence.
+    "Hirose DM3D-SF":           (17.0, 91.5, 180),  # mouth to the bottom edge
 
     # Headers on the free edges. The dev board covers the middle of this
     # board end to end, so nothing can present a connector there.
