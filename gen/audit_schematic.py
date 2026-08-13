@@ -38,6 +38,64 @@ CHAR_W = 0.70
 LINE_H = 1.30
 
 
+def lib_info(src):
+    """Per library symbol: whether pin numbers are drawn, and where the pins
+    are. Pin numbers are the text most likely to collide with something,
+    because KiCad draws them wherever the pin is and nothing moves them."""
+    info = {}
+    for m in re.finditer(r'\n\t\t\(symbol "([^"]+)"\n(.*?)\n\t\t\)\n', src, re.S):
+        name, body = m.group(1), m.group(2)
+        if "/" in name or name.count("_") > 90:
+            continue
+        hidden = "(pin_numbers" in body and "(hide yes)" in body.split("(pin_names")[0]
+        pins = []
+        for q in re.finditer(
+                r'\(pin \w+ \w+\s*\(at ([-\d.]+) ([-\d.]+) ([-\d.]+)\)'
+                r'\s*\(length ([-\d.]+)\)(.*?)\(number "([^"]+)"', body, re.S):
+            x, y, ang, ln, tail, num = q.groups()
+            if "(hide yes)" in tail:
+                continue
+            pins.append((float(x), float(y), float(ang), float(ln), num))
+        info[name] = (hidden, pins)
+    return info
+
+
+def rot(theta, x, y):
+    import math
+    r = math.radians(theta)
+    c, s2 = round(math.cos(r), 6), round(math.sin(r), 6)
+    return x * c - y * s2, x * s2 + y * c
+
+
+def text_box(val, x, y, angle, size=1.27, justify=""):
+    """Bounding box of a stroke-font string.
+
+    Rotated if it is on its side, and anchored the way KiCad anchors it:
+    left-justified text grows to the right of its position, right-justified
+    to the left, and only unjustified text is centred. Getting that wrong is
+    half a string's width of error, which is enough to invent collisions and
+    to hide real ones.
+    """
+    w = len(val) * size * CHAR_W
+    # Cap height, which for KiCad's stroke font is the nominal size. 1.2x
+    # was padding invented to be safe and it reported adjacent labels on a
+    # 2.54 mm connector pitch as colliding when the plot shows 1.3 mm of
+    # daylight between them.
+    h = size
+    vertical = int(angle) % 180 == 90
+    if vertical:
+        w, h = h, w
+    if "left" in justify:
+        x0, x1 = (x - w / 2, x + w / 2) if vertical else (x, x + w)
+        y0, y1 = (y, y + h) if vertical else (y - h / 2, y + h / 2)
+    elif "right" in justify:
+        x0, x1 = (x - w / 2, x + w / 2) if vertical else (x - w, x)
+        y0, y1 = (y - h, y) if vertical else (y - h / 2, y + h / 2)
+    else:
+        x0, x1, y0, y1 = x - w / 2, x + w / 2, y - h / 2, y + h / 2
+    return (x0, y0, x1, y1)
+
+
 def sheets():
     for name in sorted(os.listdir(PROJ)):
         if name.endswith(".kicad_sch"):
@@ -47,6 +105,7 @@ def sheets():
 def parse(path):
     """Text boxes, symbol bodies and wire endpoints from one sheet."""
     src = open(path, encoding="utf-8").read()
+    libs = lib_info(src)
 
     # Skip the (lib_symbols ...) block. It is the library definitions, not
     # placed parts: every symbol in it carries Reference/Value properties at
@@ -67,22 +126,68 @@ def parse(path):
 
     texts, symbols, wires = [], [], []
 
+    # The generator writes compact s-expressions and KiCad's own libraries
+    # write tab-indented ones, so match on the tokens rather than on layout.
     for m in re.finditer(
-            r'\(property "([^"]*)" "([^"]*)"\s*\(at ([-\d.]+) ([-\d.]+)[^)]*\)'
-            r'(.*?)\n\t\t\)', src, re.S):
-        key, val, x, y, tail = m.groups()
-        if not val.strip() or "(hide yes)" in tail:
+            r'\(property "([^"]*)" "([^"]*)"\s*\(at ([-\d.]+) ([-\d.]+) ([-\d.]+)\)',
+            src):
+        key, val, x, y, _r = m.groups()
+        tail = src[m.end():m.end() + 260]
+        head = tail.split("(property")[0]
+        # Two spellings. KiCad 9 writes "(hide yes)"; the generator still
+        # emits the older bare "hide" token, which KiCad honours. Missing the
+        # second form made every hidden power-symbol reference look like a
+        # visible text item sitting on its own value -- about half the
+        # collisions this audit first reported were that.
+        if not val.strip() or "(hide yes)" in head or "hide)" in head:
+            continue
+        # A power symbol's or a flag's reference (#PWR012, #FLG003) is
+        # never drawn -- the rail name in the Value field is the label.
+        # Excluded by name as well as by the hide flag, so the audit does
+        # not depend on which spelling of that flag the generator emits.
+        if val.startswith("#"):
+            continue
+        if key in ("Footprint", "Datasheet", "Description", "MPN", "Note",
+                   "Intersheet References", "ki_keywords", "ki_description",
+                   "ki_fp_filters", "Sim.Device", "Sim.Pins"):
             continue
         size = 1.27
         sm = re.search(r"\(size ([\d.]+)", tail)
         if sm:
             size = float(sm.group(1))
-        w = len(val) * size * CHAR_W
-        texts.append((key, val, float(x) - w / 2, float(y) - size * 0.6,
-                      float(x) + w / 2, float(y) + size * 0.6))
+        jm = re.search(r"\(justify ([a-z ]+)\)", head)
+        texts.append((key, val) + text_box(val, float(x), float(y), float(_r),
+                                           size, jm.group(1) if jm else ""))
 
-    for m in re.finditer(r'\(symbol\s*\(lib_id "([^"]*)"\)\s*\(at ([-\d.]+) ([-\d.]+)', src):
-        symbols.append((m.group(1), float(m.group(2)), float(m.group(3))))
+    for m in re.finditer(
+            r'\(symbol\s*\(lib_id "([^"]*)"\)\s*\(at ([-\d.]+) ([-\d.]+) ([-\d.]+)\)', src):
+        lib_id, sx, sy, theta = (m.group(1), float(m.group(2)),
+                                 float(m.group(3)), float(m.group(4)))
+        symbols.append((lib_id, sx, sy))
+        hidden, pins = libs.get(lib_id, (True, []))
+        if hidden:
+            continue
+        for px, py, ang, ln, num in pins:
+            # KiCad draws the number about a third of the way along the pin,
+            # just off the line. Close enough to catch a label sitting on it.
+            import math
+            a = math.radians(ang)
+            mx = px + math.cos(a) * ln * 0.45
+            my = py + math.sin(a) * ln * 0.45
+            ox, oy = rot(-theta, mx, -my)
+            tx, ty = sx + ox, sy + oy
+            texts.append(("pin", num) + text_box(num, tx, ty, 0))
+
+    # Net labels of every flavour.
+    for kind in ("label", "global_label", "hierarchical_label"):
+        for m in re.finditer(
+                r'\(%s "([^"]*)"(?:\s*\(shape \w+\))?\s*'
+                r'\(at ([-\d.]+) ([-\d.]+) ([-\d.]+)\)' % kind, src):
+            val, lx, ly = m.group(1), float(m.group(2)), float(m.group(3))
+            tail = src[m.end():m.end() + 160]
+            jm = re.search(r"\(justify ([a-z ]+)\)", tail)
+            texts.append((kind, val) + text_box(val, lx, ly, float(m.group(4)),
+                                                1.27, jm.group(1) if jm else ""))
 
     for m in re.finditer(r'\(wire\s*\(pts\s*\(xy ([-\d.]+) ([-\d.]+)\)\s*\(xy ([-\d.]+) ([-\d.]+)\)', src):
         wires.append(tuple(float(g) for g in m.groups()))
@@ -117,7 +222,9 @@ def main():
                 _k2, v2, bx1, by1, bx2, by2 = texts[j]
                 if (min(ax2, bx2) - max(ax1, bx1) > 0.05
                         and min(ay2, by2) - max(ay1, by1) > 0.05):
-                    clashes.append("%s / %s" % (v1[:14], v2[:14]))
+                    clashes.append("%-9s %-14s / %-9s %-14s at (%.0f, %.0f)"
+                                   % (_k1[:9], v1[:14], _k2[:9], v2[:14],
+                                      (ax1 + ax2) / 2, (ay1 + ay2) / 2))
 
         # A symbol is "loose" if no wire end lands anywhere near its origin.
         # Crude, but it separates the wired blocks from the shelf-packed
@@ -131,7 +238,7 @@ def main():
         total_loose += len(loose)
         print("  %-26s %3d symbols  %3d wires  %3d text clashes  %3d unwired"
               % (name, len(symbols), len(wires), len(clashes), len(loose)))
-        for c in clashes[:4]:
+        for c in clashes[:6]:
             print("        clash: %s" % c)
 
     print("\n  %d text clashes, %d of %d symbols unwired (%.0f%%)"

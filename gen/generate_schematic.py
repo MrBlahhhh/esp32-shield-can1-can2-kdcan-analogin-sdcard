@@ -121,6 +121,28 @@ def find_symbol_dir():
     return None
 
 
+# A two-pin symbol's pin numbers say nothing its graphic does not already say
+# -- polarity is the cathode bar and the plus sign, not the digit -- and they
+# reliably collide with whatever the pin connects to. "+5VS" printed through a
+# solder jumper's "2" rendered the rail as "+2VS", which is worse than useless
+# on the one drawing somebody reads with a probe in their hand.
+#
+# KiCad's own Device:R and Device:C already hide theirs. This extends that to
+# every two-pin symbol, which is where the collisions were.
+_PIN_NUMBERS_RE = re.compile(r"\(pin_numbers\b[^()]*(?:\([^()]*\)[^()]*)*\)")
+
+
+def hide_pin_numbers(text):
+    """Force (pin_numbers (hide yes)) into a library symbol definition."""
+    hidden = "(pin_numbers (hide yes))"
+    if _PIN_NUMBERS_RE.search(text):
+        return _PIN_NUMBERS_RE.sub(hidden, text, count=1)
+    nl = text.find("\n")
+    if nl < 0:
+        return text
+    return text[:nl + 1] + "\t\t" + hidden + "\n" + text[nl + 1:]
+
+
 class SymbolLibs:
     """Reads the installed KiCad symbol libraries."""
 
@@ -209,8 +231,9 @@ class SymbolLibs:
         parent = self.extends(lib_id)
         if parent is None:
             text = self._raw[lib][name]
-            return text.replace('(symbol "%s"' % name,
+            text = text.replace('(symbol "%s"' % name,
                                 '(symbol "%s:%s"' % (lib, name), 1)
+            return self._maybe_hide_numbers(lib_id, text)
 
         text = self._raw[lib][parent]
         child = self._raw[lib][name]
@@ -224,7 +247,12 @@ class SymbolLibs:
         text = text.replace('(symbol "%s_' % parent, '(symbol "%s_' % name)
         text = text.replace('(symbol "%s"' % parent,
                             '(symbol "%s:%s"' % (lib, name), 1)
-        return text
+        return self._maybe_hide_numbers(lib_id, text)
+
+    def _maybe_hide_numbers(self, lib_id, text):
+        visible = [q for q in self.pins(lib_id) if not q[5]]
+        return hide_pin_numbers(text) if len(visible) == 2 else text
+
 
     def pins(self, lib_id):
         """[(number, name, local_x, local_y, angle, hidden)] resolving `extends`.
@@ -1012,7 +1040,7 @@ part(mc, "J", "Connector_Generic:Conn_01x04", "Rail break-out", HDR4,
 
 # ------------------------------------------------------------- SD card ----
 sd = sheet("SD Card", "sdcard.kicad_sch",
-           "microSD in 4-bit SDMMC mode with a switchable card supply")
+           "microSD in 1-bit SDMMC mode with a switchable card supply")
 
 part(sd, "J", "Connector:Micro_SD_Card_Det1", "microSD push-pull",
      "Connector_Card:microSD_HC_Hirose_DM3D-SF",
@@ -1099,7 +1127,7 @@ part(cn, "L", "Device:L_Coupled", "51uH", "esp32autosport:L_CommonMode_TDK_ACT45
      "TDK ACT45B-510-2P-TL003",
      "AEC-Q200 CAN choke; footprint pads renumbered so symbol winding 1-2 is "
      "the package's top (1-4) winding", lcsc="C76584")
-part(cn, "JP", "Jumper:SolderJumper_2_Open", "TERM (default OFF)", SJ2,
+part(cn, "JP", "Jumper:SolderJumper_2_Open", "TERM", SJ2,
      {"1": "CAN_H", "2": "TERM_A"},
      note="Ships OPEN: unterminated. Bridge the pads only when this board is "
           "an END node on its own bus. A vehicle's bus -- OBD-II diagnostics "
@@ -1185,7 +1213,7 @@ part(cn, "D", "Device:D_Schottky_Dual_Series_AKC", "BAT54S", SOT23,
 # unstuffed by default and the board works without it. A few modules are
 # happier seeing a tester pull-up as well; the jumper is here so that is a
 # soldering iron rather than a respin. It hangs off the fused OBD 12 V.
-part(cn, "JP", "Jumper:SolderJumper_2_Open", "KPU (default OFF)", SJ2,
+part(cn, "JP", "Jumper:SolderJumper_2_Open", "KPU", SJ2,
      {"1": "OBD_VBAT_F", "2": "K_PU"},
      note="Ships OPEN. Bridge only if a module will not answer without a "
           "tester pull-up on the K-line")
@@ -1263,7 +1291,7 @@ part(cn, "L", "Device:L_Coupled", "51uH", "esp32autosport:L_CommonMode_TDK_ACT45
      {"1": "CAN2H_T", "2": "CAN2_H_C", "3": "CAN2L_T", "4": "CAN2_L_C"},
      "TDK ACT45B-510-2P-TL003", "Second bus choke, same part as L1",
      lcsc="C76584")
-part(cn, "JP", "Jumper:SolderJumper_2_Open", "TERM2 (default OFF)", SJ2,
+part(cn, "JP", "Jumper:SolderJumper_2_Open", "TERM2", SJ2,
      {"1": "CAN2_H_C", "2": "TERM2_A"},
      note="Ships OPEN, for the same reason TERM does: a vehicle bus is "
           "already terminated at both ends")
@@ -1284,12 +1312,12 @@ part(cn, "D", "Device:D_TVS", "SMAJ26CA", SMA, {"1": "AUX_A", "2": "GND"},
      "Diodes Inc SMAJ26CA-13-F", "Aux port clamp, either mode", lcsc="C134976")
 part(cn, "D", "Device:D_TVS", "SMAJ26CA", SMA, {"1": "AUX_B", "2": "GND"},
      "Diodes Inc SMAJ26CA-13-F", "Aux port clamp, either mode", lcsc="C134976")
-part(cn, "JP", "Jumper:SolderJumper_3_Bridged12", "AUXSEL (default K-line)", SJ3B12,
+part(cn, "JP", "Jumper:SolderJumper_3_Bridged12", "AUXSEL", SJ3B12,
      {"2": "AUX_A", "1": "K_LINE", "3": "CAN2_H_C"},
      note="Ships BRIDGED 1-2 = K-line on harness pin 5, which is what an "
           "R53 wants. For the second CAN instead: cut 1-2, bridge 2-3, and "
           "close AUXCL below. Both, or neither, is a bus that does not work")
-part(cn, "JP", "Jumper:SolderJumper_2_Open", "AUXCL (default OFF)", SJ2,
+part(cn, "JP", "Jumper:SolderJumper_2_Open", "AUXCL", SJ2,
      {"1": "AUX_B", "2": "CAN2_L_C"},
      note="The second half of AUXSEL. Open in K-line mode, which also leaves "
           "the second transceiver looking at an open circuit -- harmless, "
@@ -1590,6 +1618,133 @@ def pin_clearance(libs, part):
     part["_bup"], part["_bdown"] = up, down
 
 
+# --------------------------------------------------------------------------
+# Rail ladders
+# --------------------------------------------------------------------------
+
+LADDER_PITCH = 7.62      # between rungs; two grid squares
+LADDER_MIN = 2           # two rungs already beat two islands
+
+
+def build_ladders(libs, sh, claimed):
+    """Turn loose two-pin parts that share a rail pair into a drawn ladder.
+
+    A decoupling capacitor is a two-pin part with a rail on each pin, and the
+    column packer has no reason to put one next to another. Each therefore
+    came out as its own island with a net label at both ends -- twenty-odd of
+    them down one edge of the power sheet, electrically perfect and visually
+    a parts bin. The netlist is the same either way; what is missing is the
+    drawing.
+
+    So: group the leftovers by which pair of rails they sit across, and for
+    any group big enough to be worth it, emit a block. One horizontal wire
+    along the top pins, one along the bottom, a junction at every rung and a
+    power symbol at each end -- which is what a bypass bank looks like when a
+    person draws it, and it removes two labels per part into the bargain.
+
+    Returns block dicts in the same shape as gen/sch_blocks.py's, so the rest
+    of the machinery -- wire splitting at junctions, label ownership, rail
+    placement -- applies to them unchanged.
+    """
+    by_pair = {}
+    for part in sh["parts"]:
+        if part["ref"] in claimed or part["prefix"].startswith("#"):
+            continue
+        pins = [(num, net) for num, net in part["pins"].items()]
+        if len(pins) != 2:
+            continue
+        nets = {net for _n, net in pins}
+        if len(nets) != 2:
+            continue
+        visible = [q for q in libs.pins(part["lib_id"]) if not q[5]]
+        if len(visible) != 2:
+            continue
+        # Signature is the actual pin geometry, not the symbol name. A ladder
+        # is two straight wires with rungs between them, so all that matters
+        # is that the rungs put their pins in the same two places -- which
+        # lets a resistor share a ladder with a capacitor (the supercap
+        # bank's balancing resistors do exactly that) while keeping out the
+        # TVS diode whose pins are 1.3 mm closer together and which ERC
+        # caught as two unconnected wire endpoints.
+        sig = tuple(sorted(
+            tuple(round(c, 3) for c in pin_geometry(q[2], q[3], q[4], 0)[0])
+            for q in visible))
+        by_pair.setdefault((frozenset(nets), sig), []).append(part)
+
+    out = []
+    for (pair, _sig), parts in sorted(by_pair.items(), key=lambda kv: -len(kv[1])):
+        if len(parts) < LADDER_MIN:
+            continue
+        # Which rail goes on top: the non-ground one, so the ladder reads the
+        # way every schematic draws a bypass bank.
+        a, b = sorted(pair, key=lambda n: (n == "GND", n))
+        top_net, bot_net = a, b
+
+        # Pin offsets for an unrotated part, and the rotation that puts
+        # top_net's pin above the other one.
+        def offsets(part, theta):
+            got = {}
+            for num, _nm, lx, ly, ang, hid in libs.pins(part["lib_id"]):
+                if hid:
+                    continue
+                off, _d = pin_geometry(lx, ly, ang, theta)
+                got[num] = off
+            return got
+
+        first = parts[0]
+        theta = 0
+        off = offsets(first, 0)
+        num_top = next(n for n, v in first["pins"].items() if v == top_net)
+        num_bot = next(n for n, v in first["pins"].items() if v == bot_net)
+        if off[num_top][1] > off[num_bot][1]:
+            theta = 180
+            off = offsets(first, 180)
+        y_top = off[num_top][1]
+        y_bot = off[num_bot][1]
+
+        members, junctions = [], []
+        for i, part in enumerate(parts):
+            part["theta"] = theta
+            part["ext"] = symbol_extent(libs, part["lib_id"], theta)
+            part["_up"] = part["_down"] = 0.0
+            pin_clearance(libs, part)
+            if i:
+                members.append((part, i * LADDER_PITCH, 0.0))
+            junctions.append((i * LADDER_PITCH, y_top))
+            junctions.append((i * LADDER_PITCH, y_bot))
+        span = (len(parts) - 1) * LADDER_PITCH
+        # The rails hang off the left end, one grid square clear of the first
+        # rung so the power symbol has somewhere to sit.
+        x0 = -2.54
+        # A junction at every rung the wire runs THROUGH. Only the last one
+        # is a true wire end; the first is not, because the wire carries on
+        # past it to reach the power symbol -- and a pin sitting mid-segment
+        # with no junction is not connected, which is exactly how the first
+        # ladder came out with its anchor capacitor floating.
+        junctions = [j for j in junctions if j[0] < span - 0.01]
+        print("    ladder %-14s %-9s x%d: %s"
+              % (sh["file"], "/".join(sorted(pair)), len(parts),
+                 " ".join(q["ref"] for q in parts)))
+        out.append({
+            "sheet": sh["name"],
+            "_ladder": True,
+            "anchor": (first["value"], set(first["pins"].values())),
+            "_anchor_part": first,
+            "parts": [],
+            "_members": members,
+            "wires": [[(x0, y_top), (span, y_top)],
+                      [(x0, y_bot), (span, y_bot)]],
+            "junctions": junctions,
+            "labels": {n: (x0, y, 180) for n, y in
+                       ((top_net, y_top), (bot_net, y_bot))
+                       if n not in RAILS},
+            "rails": [(n, x0, y, d) for n, y, d in
+                      ((top_net, y_top, (0, -1)), (bot_net, y_bot, (0, 1)))
+                      if n in RAILS],
+        })
+    return out
+
+
 def apply_blocks(libs, sh):
     """Place the hand-drawn blocks that live on this sheet.
 
@@ -1624,6 +1779,20 @@ def apply_blocks(libs, sh):
         placed.append({"blk": blk, "anchor": anchor, "members": members})
         for part, dx, dy in members:
             owned[part["ref"]] = (anchor, dx, dy)
+    # Generated ladders, after the hand-drawn blocks have taken what they
+    # want. Everything they claim stops being a loose part.
+    for blk in build_ladders(libs, sh, set(owned) | {p["ref"] for p in
+                                                     [e["anchor"] for e in placed]}):
+        anchor_part = blk.pop("_anchor_part")
+        members = blk.pop("_members")
+        anchor_part["_block"] = True
+        anchor_part["_own_ext"] = anchor_part["ext"]
+        for part, _dx, _dy in members:
+            part["_block"] = True
+        placed.append({"blk": blk, "anchor": anchor_part, "members": members})
+        for part, dx, dy in members:
+            owned[part["ref"]] = (anchor_part, dx, dy)
+
     sh["_blocks"] = placed
     return owned
 
@@ -1671,11 +1840,18 @@ def attach_satellites(libs, sh, owned=()):
     The satellite sits WIRE_GAP beyond the host pin, facing back at it, so
     the connection is a single straight wire rather than a pair of labels.
 
-    Parts a hand-drawn block already owns are off limits. This runs after
-    apply_blocks and writes position and rotation last, so without the
-    guard it quietly re-parked block members -- the 5 V bootstrap cap ended
-    up rotated and 6 mm from where the block drew its wire, and the only
-    symptom was two nets KiCad could no longer name.
+    Parts a block already owns are off limits -- ANCHORS AS WELL AS MEMBERS.
+    This runs after apply_blocks and writes position and rotation last, so
+    without the guard it quietly re-parks block parts: the 5 V bootstrap cap
+    ended up rotated and 6 mm from where the block drew its wire, and the
+    only symptom was two nets KiCad could no longer name.
+
+    The anchor half of that guard was missing until the generated rail
+    ladders exposed it. A block's wires are drawn relative to its anchor, so
+    moving the anchor moves the whole drawing and leaves nothing where the
+    members are -- the first ladder built came out with its anchor
+    capacitor floating with both pins unconnected, and ERC was the only
+    thing that noticed.
     """
     sats = {}
     for pa, na, pb, nb, net in wire_pairs(sh):
@@ -1758,7 +1934,9 @@ def place(libs):
                              max([ay1] + [q[1] for q in pts]))
 
         # Satellites ride with their host, so they are not packed separately.
-        sats = attach_satellites(libs, sh, blocks)
+        # Every part any block owns, anchors included.
+        claimed = set(blocks) | {e["anchor"]["ref"] for e in sh.get("_blocks", [])}
+        sats = attach_satellites(libs, sh, claimed)
         for ref, info in sats.items():
             host = next(q for q in sh["parts"] if q["ref"] == info["host"])
             sx0, sx1, sy0, sy1 = next(q for q in sh["parts"]
@@ -1850,8 +2028,17 @@ def emit_symbol(libs, sh, p, sheet_uuid):
     # the text landed straight on top of that: "LM5164 (5V)" printed through
     # the GND symbol under U2. Clear the whole stub where a pin goes that way.
     up, down = p.get("_up", 0.0), p.get("_down", 0.0)
-    ref_y = p["y"] + y0 - 2.0 - up
-    val_y = p["y"] + y1 + 2.0 + down
+    # BODY_HALF is a floor on how far out the text goes, and it is not
+    # cosmetic. The extent these offsets work from is the box around the
+    # PINS, and a symbol's graphic is routinely drawn outside it: a
+    # capacitor lying on its side has pins at +/-3.81 in x and a y extent of
+    # exactly zero, so "C13" and "10uF" were placed 2 mm from the centreline
+    # and printed straight through the plates, which stand about 1.9 mm
+    # proud. Same root cause as the power symbols printing through their own
+    # arrows.
+    BODY_HALF = 1.9
+    ref_y = p["y"] + min(y0, -BODY_HALF) - 2.0 - up
+    val_y = p["y"] + max(y1, BODY_HALF) + 2.0 + down
     ref_x = val_x = p["x"]
     # Inside a hand-drawn block the parts sit a few millimetres apart, and
     # the packer's generous text offsets then print one part's value through
@@ -1872,8 +2059,8 @@ def emit_symbol(libs, sh, p, sheet_uuid):
             # or a power symbol with it, and the text lands on that: the
             # buffer printed "74AHCT1G125" straight through the ground
             # symbol under it. Clear the whole stub, as the packer does.
-            ref_y = p["y"] + y0 - 1.27 - p.get("_bup", 0.0)
-            val_y = p["y"] + y1 + 2.03 + p.get("_bdown", 0.0)
+            ref_y = p["y"] + min(y0, -BODY_HALF) - 1.4 - p.get("_bup", 0.0)
+            val_y = p["y"] + max(y1, BODY_HALF) + 2.1 + p.get("_bdown", 0.0)
         else:
             ref_x = val_x = p["x"] + x1 + 1.27
             ref_y, val_y = p["y"] - 1.27, p["y"] + 1.78
@@ -1882,13 +2069,24 @@ def emit_symbol(libs, sh, p, sheet_uuid):
     # printed over "R16" on the very resistor it was feeding.
     if p.get("_pwr_dir"):
         dx, dy = p["_pwr_dir"]
+        # 3.4 mm, not 2.0. The extent these offsets work from is the pin box,
+        # and a power symbol's arrow or bar is drawn OUTSIDE it -- so 2 mm of
+        # clearance from the extent was about zero from the graphic, and
+        # every rail on the board printed its name through its own arrow.
+        # "+5VS" came out reading "+2VS" at a glance, which is exactly the
+        # sort of thing that sends somebody probing the wrong rail.
         if dy < 0:
-            val_y = p["y"] + y0 - 2.0
+            val_y = p["y"] + y0 - 3.4
         elif dy > 0:
-            val_y = p["y"] + y1 + 2.0
+            val_y = p["y"] + y1 + 3.4
         else:
-            val_y = p["y"] + 1.27
-            val_x = p["x"] + (x1 + 2.0 if dx > 0 else x0 - 2.0)
+            # Centred on its own pin, not 1.27 mm below it. Connector pins sit
+            # on a 2.54 mm pitch, so half a pitch of droop puts a rail's name
+            # squarely between two pins and it collides with whatever label
+            # the next one down is carrying -- "+5VS" into "AIN1_IN" on the
+            # sensor harness, "SD_VDD" into "SD_CLK_C" on the card socket.
+            val_y = p["y"]
+            val_x = p["x"] + (x1 + 5.0 if dx > 0 else x0 - 5.0)
     # A power symbol's reference (#PWR003) is noise -- the rail name in the
     # Value field is the label. KiCad hides these by convention and so do we,
     # along with the flags'.

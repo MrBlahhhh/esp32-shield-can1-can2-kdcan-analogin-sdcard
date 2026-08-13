@@ -111,7 +111,7 @@ the through-hole connectors, the two supercapacitors and the dev board.
 | `gen/simulate_firmware.py` | **50 checks**, the real sketch compiled for the host against a model of this board |
 | `gen/mutate_firmware.py` | deliberately breaks the firmware 17 ways to prove the suite notices — **17 of 17 caught** |
 | `gen/simulate.py` | ngspice: analog channel, crank, CAN bus, system budgets, log fidelity |
-| `gen/audit_*.py` | docs, polarity, straps, paste, mechanical, PCB, routes |
+| `gen/audit_*.py` | docs, polarity, straps, paste, mechanical, PCB, routes, schematic readability |
 
 Study 0 of the firmware suite is the one everything else rests on: it dumps
 the simulator's pin map and compares it to `netlist.txt`, so a model built
@@ -134,6 +134,9 @@ wrong board.
 - **Check the dev board revision.** v1.1 puts the onboard RGB LED on IO38,
   which this board leaves free for it. Some revisions use IO48, which is the
   WS2812 output here and would clash.
+- **The schematic still has about 20 text collisions** out of the ~150 it
+  started with, mostly a label brushing a neighbour inside a hand-drawn
+  block. `gen/audit_schematic.py` lists each one with coordinates.
 - **Two bypass capacitors sit 8.7 mm from the pin they bypass**, against the
   6 mm `gen/audit_pcb.py` asks for. That is the width of the SOIC-8 itself:
   the shelf packer keeps each bypass immediately beside its IC, but fills

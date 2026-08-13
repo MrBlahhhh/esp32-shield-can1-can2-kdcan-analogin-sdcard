@@ -360,7 +360,7 @@ CAN = {
                                                          25.40,   0.00,   0),
         ("SMAJ26CA", {"CAN_H", "GND"},                   43.18,  -8.89, 270),
         ("SMAJ26CA", {"CAN_L", "GND"},                   43.18,  24.13, 270),
-        ("TERM (default OFF)", {"CAN_H", "TERM_A"},       53.34,  -8.89, 270),
+        ("TERM", {"CAN_H", "TERM_A"},       53.34,  -8.89, 270),
         ("60.4",   {"TERM_A", "CAN_SPLIT"},              53.34,   1.27,   0),
         ("60.4",   {"CAN_SPLIT", "CAN_L"},               53.34,  12.70,   0),
         ("4.7nF",  {"CAN_SPLIT", "GND"},                 60.96,   8.89,   0),
@@ -413,25 +413,30 @@ SDCARD = {
         # The switched rail runs down the left; the bulk and bypass caps sit
         # on it at the top, then the five pull-ups, each one reaching right
         # to the card line it holds up.
-        ("10uF",     {"SD_VDD", "GND"},        -100.33, -64.77, 270),
-        ("100nF",    {"SD_VDD", "GND"},        -100.33, -59.69, 270),
+        # 10.16 apart, not 5.08. A horizontal capacitor shows its reference
+        # above and its value below, and once both were moved clear of the
+        # plates that is about 4 mm each way -- so at 5.08 pitch they printed
+        # through the plates, and at 7.62 C13's value met C14's reference in
+        # the gap between them.
+        ("10uF",     {"SD_VDD", "GND"},        -100.33, -67.31, 270),
+        ("100nF",    {"SD_VDD", "GND"},        -100.33, -57.15, 270),
         ("10k",      {"SD_VDD", "SD_CMD_C"},    -92.71, -50.80,  90),
-        ("10k",      {"SD_VDD", "SD_D0_C"},     -92.71, -43.18,  90),
-        ("10k",      {"SD_VDD", "SD_D1_C"},     -92.71, -35.56,  90),
-        ("10k",      {"SD_VDD", "SD_D2_C"},     -92.71, -27.94,  90),
-        ("10k",      {"SD_VDD", "SD_D3_C"},     -92.71, -20.32,  90),
+        ("10k",      {"SD_VDD", "SD_D0_C"},     -92.71, -40.64,  90),
+        ("10k",      {"SD_VDD", "SD_D1_C"},     -92.71, -30.48,  90),
+        ("10k",      {"SD_VDD", "SD_D2_C"},     -92.71, -20.32,  90),
+        ("10k",      {"SD_VDD", "SD_D3_C"},     -92.71, -10.16,  90),
         # Only the three lines that still reach the MCU get a damping
         # resistor. D1/D2/D3 stop at the card in 1-bit mode -- they keep
         # their pull-ups above, because a card samples DAT3 at power-up and
         # falls into SPI mode if it finds it low, but there is no transmission
         # line left to damp.
         ("33",       {"SD_CMD", "SD_CMD_C"},    -64.77, -10.16,  90),
-        ("33",       {"SD_CLK", "SD_CLK_C"},    -64.77,  -2.54,  90),
-        ("33",       {"SD_D0", "SD_D0_C"},      -64.77,   5.08,  90),
+        ("33",       {"SD_CLK", "SD_CLK_C"},    -64.77,   0.00,  90),
+        ("33",       {"SD_D0", "SD_D0_C"},      -64.77,  10.16,  90),
         ("47k",      {"+3V3", "SD_CD"},         -64.77,  25.40,   0),
     ],
     "wires": [
-        [(-74.93, -68.58), (-96.52, -68.58), (-96.52, -20.32)],  # switched rail
+        [(-74.93, -68.58), (-96.52, -68.58), (-96.52, -10.16)],  # switched rail
         [(-67.31, -73.66), (-60.96, -73.66), (-60.96, -74.93)],  # gate to R
         [(-60.96, -73.66), (-54.61, -73.66), (-54.61, -68.58)],  # gate to FET
         # The enable pull-down sits with its top pin on this wire, so the
@@ -439,8 +444,8 @@ SDCARD = {
         [(-69.85, -63.50), (-62.23, -63.50)],                    # enable
     ],
     "junctions": [(-60.96, -73.66), (-66.04, -63.50),
-                  (-96.52, -64.77), (-96.52, -59.69), (-96.52, -50.80),
-                  (-96.52, -43.18), (-96.52, -35.56), (-96.52, -27.94)],
+                  (-96.52, -67.31), (-96.52, -57.15), (-96.52, -50.80),
+                  (-96.52, -40.64), (-96.52, -30.48), (-96.52, -20.32)],
     "labels": {
         "SD_PG": (-58.42, -73.66, 0),
         "SD_EN_G": (-68.58, -63.50, 0),
