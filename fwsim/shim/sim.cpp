@@ -23,7 +23,7 @@ namespace sim {
 
 static const double R_BYPASS = 1.0000;   // 0-3.3 V, 10k shorted
 static const double R_5V     = 0.5769;   // 0-5 V,  15/26 (s3zero only now)
-static const double R_16V    = 1.0/6.0;  // 0-16 V, 2.2/13.2 -- the only
+static const double R_16V    = 0.1673;   // 0-16 V, 2.21/13.21 -- the only
                                          // ratio on the carrier board
 
 static Board make_s3zero() {

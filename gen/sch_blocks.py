@@ -118,7 +118,7 @@ def channel(n):
             ("10k",        {a, ain},         26.67,   0.00,  90),
             # Rotation 0 is VERTICAL for Device:R and Device:C -- 90 lays
             # them down. Both of these are legs to ground, so they stand up.
-            ("2.2k",       {ain, "GND"},     35.56,   7.62,   0),
+            ("2.21k",      {ain, "GND"},     35.56,   7.62,   0),
             ("470nF",      {ain, "GND"},     45.72,   7.62,   0),
             ("BAT54S", {"GND", "+3V3", ain}, 40.64, -16.51,   0),
         ],

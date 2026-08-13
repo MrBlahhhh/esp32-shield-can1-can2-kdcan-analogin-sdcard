@@ -36,7 +36,7 @@ SKETCH = os.path.join(PROJ, "firmware", "esp32_shiftlight_wideband", "src", "mai
 # (name, what a human would call the mistake, find, replace)
 MUTATIONS = [
     ("gain-from-other-board", "DIVIDER_GAIN left at the R53 board's 2.0",
-     "static const float DIVIDER_GAIN = 6.0000f;",
+     "static const float DIVIDER_GAIN = 5.9774f;",
      "static const float DIVIDER_GAIN = 2.0f;"),
     ("led-pin", "WS2812 pin left on GPIO4",
      "#define LED_PIN     48", "#define LED_PIN     4"),

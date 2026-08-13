@@ -500,7 +500,7 @@ GENERIC_LCSC = {
     ("1nF50V", "0805"): "C46653",
     ("1uF16V", "0805"): "C28323",
     ("1uF50V", "0805"): "C28323",
-    ("2.2k", "0805"): "C17520",   # 1%, and 2.2/13.2 is exactly 1/6
+    ("2.21k0.1%", "0805"): "C865368",
     ("2.2nF50V", "0805"): "C28260",
     ("2.49k", "0805"): "C2930178",
     ("20.5k", "0805"): "C2933365",
@@ -1319,9 +1319,9 @@ an = sheet("Analog Inputs", "analog.kicad_sch",
 # comes back as a Kelvin sense wire, through an IDENTICAL attenuator, and the
 # ADS1115 subtracts the two:
 #
-#     AINn      = (Vsig + Voff) * 2.2/13.2
-#     AGND_SENSE= (       Voff) * 2.2/13.2
-#     AINn - AGND_SENSE = Vsig * 2.2/13.2     <- Voff gone, exactly
+#     AINn      = (Vsig + Voff) * 2.21/13.21
+#     AGND_SENSE= (       Voff) * 2.21/13.21
+#     AINn - AGND_SENSE = Vsig * 2.21/13.21   <- Voff gone, exactly
 #
 # SENS_RTN is a sense wire and carries ~12 uA; GND on the connector is the
 # excitation return and carries the sensors' 80 mA. They are separate pins on
@@ -1376,31 +1376,34 @@ for n in range(1, 5):
          "Littelfuse SMAJ40CA",
          "Ch%d harness transient clamp (bidirectional, 400W)" % n, lcsc="C223989")
     R(an, "1k", inp, node,
-      note="Ch%d series/fault-current limit. 1%%, not the 0.1%% thin film this "
-           "started as -- see docs/COST.md. Fifteen 0.1%% parts cost $2.68, "
-           "more than the CAN controller, to tighten a divider whose error "
-           "the ADS1115's own +/-0.30%% gain spec already dominates. Absolute "
-           "scale is a firmware calibration constant either way; what "
-           "tolerance actually buys here is the MATCH between this chain and "
-           "the return attenuator, and at 1%% a 300 mV chassis offset leaves "
-           "6 mV instead of 0.6 mV" % n)
+      note="Ch%d series/fault-current limit. 1%%, and the ONLY 1%% part in the "
+           "divider, because it is the one whose tolerance barely matters. "
+           "Gain is Rlow/(Rser+Rup+Rlow), so each resistor moves it in "
+           "proportion to its share of the total: the 10k moves it 0.758%% "
+           "per 1%%, the 2.21k 0.833%% per 1%%, and this one 0.076%% per 1%% "
+           "-- ten times less. It was also the most expensive 0.1%% part on "
+           "the board at $0.30 against $0.19 and $0.05, so it is the one to "
+           "give up. See docs/COST.md" % n)
     part(an, "JP", "Jumper:SolderJumper_2_Open", "PULLUP%d" % n, SJ2,
          {"1": "+5VS", "2": "AIN%d_PU" % n},
          note="Close for 2-wire NTC / open-collector sensors. Nothing to do "
               "with the input range -- it is about what kind of sensor is on "
               "the other end, not how many volts it swings")
     R(an, "2.49k", "AIN%d_PU" % n, node, note="Ch%d bias resistor" % n)
-    R(an, "10k", node, out,
-      note="Ch%d divider upper leg" % n)
-    R(an, "2.2k", out, "GND",
-      note="Ch%d divider lower leg. 2.2/13.2 = exactly 1/6, so 16.0 V in "
-           "gives 2.67 V at the ADC and 5.0 V gives 0.833 V -- both inside "
-           "the 3.1 V the ESP32 ADC can actually use, and the firmware's "
-           "DIVIDER_GAIN is a round 6.000. 2.2k rather than 2.21k because "
-           "E96 values do not exist in the 1%% jellybean library, and the "
-           "0.37%% it moves the ratio is a calibration constant, not an "
-           "error. This value must match the return attenuator below or the "
-           "ground correction is worse than useless" % n)
+    R(an, "10k 0.1%", node, out,
+      note="Ch%d divider upper leg. 0.1%%: this and the lower leg set the "
+           "gain between them, and there is no calibration step in the "
+           "workflow, so the tolerance IS the accuracy. Together with the "
+           "1%% series resistor the divider comes to 0.235%% worst case, "
+           "which sits just under the ADS1115's own 0.30%% gain error" % n)
+    R(an, "2.21k 0.1%", out, "GND",
+      note="Ch%d divider lower leg, and the most gain-sensitive part in the "
+           "chain at 0.833%% per 1%%. 2.21/13.21 = 0.1673, so 16.0 V in gives "
+           "2.68 V at the ADC and 5.0 V gives 0.836 V -- both inside the "
+           "3.1 V the ESP32 ADC can actually use. 0.1%% here is also the "
+           "cheap end of precision: $0.05 against the 10k's $0.19. This "
+           "value must match the return attenuator below or the ground "
+           "correction is worse than useless" % n)
     C(an, "470nF 50V", out, "GND",
       note="Ch%d anti-alias. 470nF, not the 100nF this inherited: source "
            "impedance here is (1k+10k)||2.21k = 1.84k, so 100nF puts the "
@@ -1426,8 +1429,8 @@ part(an, "D", "Device:D_TVS", "SMAJ40CA", SMA, {"1": "SENS_RTN", "2": "GND"},
      "Return-sense harness clamp. This wire is as exposed as the signals",
      lcsc="C223989")
 R(an, "1k", "SENS_RTN", "AGND_A", note="Matches the channels' 1k series")
-R(an, "10k", "AGND_A", "AGND_SENSE", note="Matches the channels' upper leg")
-R(an, "2.2k", "AGND_SENSE", "GND",
+R(an, "10k 0.1%", "AGND_A", "AGND_SENSE", note="Matches the channels' upper leg")
+R(an, "2.21k 0.1%", "AGND_SENSE", "GND",
   note="Matches the channels' lower leg. Same value, same part, same reel if "
        "possible -- the whole ground correction is the difference of two "
        "attenuators, so it is only as good as they match, and parts from one "

@@ -41,9 +41,9 @@ reflow, and a second CAN bus and a K-line the parent never had.
 | | |
 |---|---|
 | Board | 98 × 100 mm, 4 layer |
-| Parts | 153 component instances, 69 distinct BOM lines |
+| Parts | 153 component instances, 70 distinct BOM lines |
 | Nets | 90 |
-| Assembly | 128 surface-mount designators across 47 fab BOM lines |
+| Assembly | 128 surface-mount designators across 48 fab BOM lines |
 
 ## What's on it
 
@@ -52,7 +52,7 @@ reflow, and a second CAN bus and a K-line the parent never had.
 | **CAN 1** | TJA1051T/3 on the ESP32's TWAI. Common-mode choke, split termination (off by default), bidirectional clamps. |
 | **CAN 2** | MCP2518FD (SOIC-14) on SPI with a 40 MHz crystal, its own TJA1051, choke, termination and clamps. |
 | **K-line** | Discrete: 2N7002 low-side driver, clamped 22k/10k receiver, optional ISO 9141 tester pull-up on a jumper. |
-| **Analog** | 4 channels, fixed 0–16 V divider (1 %, calibrated in firmware), pull-up jumper per channel for 2-wire senders, two ADS1115s, shared Kelvin ground return. |
+| **Analog** | 4 channels, fixed 0–16 V divider (0.1 % where it sets the gain, 0.235 % worst case, no calibration needed), pull-up jumper per channel, two ADS1115s, shared Kelvin ground return. |
 | **microSD** | 1-bit SDMMC, switched card supply, ESD arrays on every contact. |
 | **Hold-up** | 2 × 0.33 F 2.7 V supercaps in series on the 5 V rail, TLV431 power-fail detector tripping at 4.20 V. |
 | **Shift light** | 74AHCT1G125 buffer so WS2812 DIN is a real 5 V, fused tap, 3-pin header. |
@@ -92,7 +92,7 @@ python gen/export_fab.py      # gerbers, positions, JLC BOM
 python gen/export_order.py    # LCSC shopping list + what to buy elsewhere
 ```
 
-Every one of the 47 fab BOM lines carries an LCSC part number, and each was
+Every one of the 48 fab BOM lines carries an LCSC part number, and each was
 checked against the live catalogue rather than assumed — see
 [`docs/PARTS.md`](docs/PARTS.md) for what that turned up, including three
 part numbers that were confidently wrong and two footprints that would not

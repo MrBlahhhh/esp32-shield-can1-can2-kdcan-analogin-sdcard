@@ -1,8 +1,10 @@
 # Where the money goes, and what to do about it
 
-> **Status: two of the three changes below are implemented.** Parts went from
-> **$18.29 to $13.87 a board, a 24 % cut.** The microSD swap was dropped after
-> checking it properly -- see "What happened to the socket" at the end.
+> **Status: implemented, then partly walked back on purpose.** Parts are
+> **$15.02 a board against $18.29, an 18 % cut.** The 1 % resistors went back
+> to 0.1 % on the two that set the gain, because there is no calibration step
+> in the workflow -- see "Which resistors actually matter" below. The microSD
+> swap was dropped after checking it properly.
 
 Prices read from LCSC on 2026-08-13, at the tier a five-board build lands in.
 Everything below is per board.
@@ -35,7 +37,42 @@ single item on the whole board once the through-hole side is counted.
 
 ## Recommended changes
 
-### 1. Drop the 0.1 % resistors to 1 % — saves $2.63
+### 1. Precision only where it changes the answer — saves $1.47
+
+**Revised.** The original version of this section put all fifteen resistors on
+1 % and leaned on a per-channel calibration constant to recover the accuracy.
+That is the right trade only if somebody actually calibrates, and nobody was
+going to, so the divider now carries 0.1 % where it counts and 1 % where it
+does not.
+
+#### Which resistors actually matter
+
+Gain is `Rlow / (Rser + Rup + Rlow)`, so each resistor moves it in proportion
+to its share of the total:
+
+| | share | gain error per 1 % of tolerance |
+|---|---:|---:|
+| 1 kΩ series | 0.076 | **0.076 %** |
+| 10 kΩ upper | 0.758 | 0.758 % |
+| 2.21 kΩ lower | 0.833 | 0.833 % |
+
+**The series resistor is ten times less sensitive than the other two — and it
+was the most expensive 0.1 % part on the board**, at $0.30 against $0.19 and
+$0.05. So it is the one to give up, and the two that set the ratio keep their
+tolerance.
+
+| build | worst case (linear) | realistic (RSS) | cost |
+|---|---:|---:|---:|
+| all 1 % | 1.667 % | 1.129 % | $0.05 |
+| **1 kΩ at 1 %, others 0.1 %** | **0.235 %** | **0.136 %** | **$1.21** |
+| all 0.1 % | 0.167 % | 0.113 % | $2.68 |
+
+For reference the ADS1115's own gain error is 0.15 % typical and 0.30 %
+maximum, so the middle row puts the divider just under the converter — the
+point past which spending more stops buying anything. It saves $1.47 against
+all-0.1 % and needs no calibration.
+
+#### The original argument, for the record
 
 The biggest surprise in the whole BOM: **fifteen resistors cost $2.68**, more
 than the CAN controller. Yageo's RT/AT 0.1 % series is 0.30 and 0.19 dollars a
@@ -129,14 +166,13 @@ channels is a false economy.
 
 | Change | saves | status |
 |---|---:|---|
-| 0.1 % → 1 % resistors | **$2.62** measured | **done** |
+| 0.1 % only where it matters | **$1.47** | **done** |
 | 1 F → 0.33 F supercaps | ~$1.80 estimated | **done** |
 | Generic microSD socket | — | **dropped**, see below |
-| **Achieved** | **$4.42** | **$18.29 → $13.87, a 24 % cut** |
+| **Achieved** | **$3.27** | **$18.29 → $15.02, an 18 % cut** |
 | One ADS1115 | $1.32 | available, costs channel 4's ground correction |
 
-The resistor saving is measured against the regenerated BOM: the SMD side went
-from $13.16 to $10.54. The supercapacitor saving is an estimate, because those
+The resistor saving is measured against the regenerated BOM. The supercapacitor saving is an estimate, because those
 are bought outside the LCSC catalogue and the price depends on the cell.
 
 ## What happened to the socket

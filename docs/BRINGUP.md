@@ -85,10 +85,10 @@ configuration — the aux pins are either/or by design.
 - [ ] Write a file, pull the USB plug mid-write, re-read the card. The file
       must be closed and intact. This is the whole point of the hold-up.
 - [ ] Feed a known 5.00 V into a channel: the ADS1115 should read
-      **0.833 V** differentially (0–16 V divider, 2.2/13.2 = exactly 1/6).
-      The dividers are 1 %, so expect up to about 1.4 % off nominal and
-      record the number -- that is the channel's calibration constant,
-      and taking it is what the 1 % parts assume you will do.
+      **0.836 V** differentially (0–16 V divider, 2.21/13.21). The two
+      gain-setting resistors are 0.1 %, so expect to be inside 0.24 % of
+      that without calibrating anything. Further out than about 1 % means a
+      wrong value fitted, not tolerance.
 - [ ] Short `SENS_RTN` to a deliberate 200 mV offset against board ground:
       the reading must **not** move. If it does, the return attenuator does
       not match the channel — check that both legs use the same values from

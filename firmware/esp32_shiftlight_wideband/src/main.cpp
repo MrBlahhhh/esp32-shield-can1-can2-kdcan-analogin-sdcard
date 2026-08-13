@@ -12,9 +12,9 @@
 //      The map is grouped by which side of the carrier each circuit sits on,
 //      because the two 22-way sockets slot every plane layer: analog, CAN and
 //      the SD bus all hang off the J1 row, K-line and I2C off the J3 row.
-//   2. The wideband divider is 2.2k/13.2k, not 10k/10k. DIVIDER_GAIN was 2.0
-//      and is now 6.0 — the original constant reads the sensor low by a
-//      factor of three here, and there is only one range to get wrong.
+//   2. The wideband divider is 2.21k/13.21k, not 10k/10k. DIVIDER_GAIN was
+//      2.0 and is now 5.9774 — the original constant reads the sensor low by
+//      a factor of three here, and there is only one range to get wrong.
 //   3. The +5 V sensor excitation is permanently on, fed from USB through a
 //      polyfuse. The parent board switched it so firmware could shed 80 mA
 //      and stretch a 127 ms ride-through; the supercap bank here holds
@@ -113,17 +113,17 @@ unsigned long canFrames = 0;      // frames since the last status line
 // AIN1 carries the wideband. gen/simulate_firmware.py study 3 measures the
 // gain end to end, and the mutation harness puts the R53 board's 2.0 back to
 // prove the study would notice.
-// 13.2 / 2.2, which is exactly 6. One divider ratio on this board, spanning
-// 0-16 V, so a 5 V sensor lands at 0.833 V and a 12 V one at 2.00 V. The
-// 0-5 V range and its 1.7334 went with the range-select jumpers -- see the
-// note above the channel loop in gen/generate_schematic.py for why one fixed
-// ratio is what makes the differential ground correction exact.
+// 13.21 / 2.21. One divider ratio on this board, spanning 0-16 V, so a 5 V
+// sensor lands at 0.836 V and a 12 V one at 2.01 V. The 0-5 V range and its
+// 1.7334 went with the range-select jumpers -- see the note above the channel
+// loop in gen/generate_schematic.py for why one fixed ratio is what makes the
+// differential ground correction exact.
 //
-// THIS IS A NOMINAL VALUE AND THE DIVIDER IS 1% NOW. Absolute scale wants a
-// per-channel calibration constant measured against a known voltage; the
-// resistors were dropped from 0.1% to 1% precisely because calibration does
-// that job better and cheaper (docs/COST.md).
-static const float DIVIDER_GAIN = 6.0000f;
+// This constant can be USED AS IS. The two gain-setting resistors are 0.1%
+// and the series resistor's 1% barely moves it, so the divider is 0.235%
+// worst case and the ADS1115's own 0.30% is the larger term. A per-channel
+// calibration would still be better, but nothing here assumes you took one.
+static const float DIVIDER_GAIN = 5.9774f;
 static const int   ESP_ADC_PIN  = 4;       // AIN1 = GPIO4 = ADC1_CH3
 static const int   VBAT_ADC_PIN = 8;       // VBAT_SNS = GPIO8, from OBD-II pin 16
 // 108.2k / 8.2k, not the 11.0 this file inherited. The schematic moved to

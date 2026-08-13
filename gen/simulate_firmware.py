@@ -62,11 +62,10 @@ BUILD = os.path.join(PROJ, ".build", "fwsim")
 R53_SKETCH = os.path.join(PROJ, "firmware", "vendor", "r53_shiftlight_wideband", "main.cpp")
 AUTOSPORT_SKETCH = os.path.join(PROJ, "firmware", "esp32_shiftlight_wideband", "src", "main.cpp")
 
-# The carrier has ONE divider ratio: 2.2 / 13.2, which is exactly 1/6,
-# spanning 0-16 V so that a 5 V and a 12 V sensor both fit without a jumper.
-# RANGE_5V is what the R53 board's own front end does, and is kept only for
-# the control comparison.
-RANGE_16V = 1.0 / 6.0
+# The carrier has ONE divider ratio: 2.21 / 13.21, spanning 0-16 V so that a
+# 5 V and a 12 V sensor both fit without a jumper. RANGE_5V is what the R53
+# board's own front end does, and is kept only for the control comparison.
+RANGE_16V = 0.1673
 RANGE_5V = 0.5769          # the s3zero control board, not this one
 ADC_FULLSCALE = 3.10
 

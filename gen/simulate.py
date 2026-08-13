@@ -153,7 +153,7 @@ RANGES = [
     # One range. The 0-5 V and bypass settings went with the range and
     # bypass jumpers -- 0-16 V spans a 5 V and a 12 V sensor both, and one
     # fixed ratio is what makes the differential ground correction exact.
-    ("0-16 V  (fixed, 2.2k)", False, 2.2e3, False, 16.0),
+    ("0-16 V  (fixed, 2.21k)", False, 2.21e3, False, 16.0),
 ]
 
 

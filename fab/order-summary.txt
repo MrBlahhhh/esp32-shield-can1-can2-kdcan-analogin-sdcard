@@ -7,15 +7,16 @@ Parts order for 5 boards
    minimum order quantity and order multiple.
 
    part          order  needed  comment            designators
-   C17414          100      75  10k                R19,R20,R21,R22,R23,R25,R28,R32,R34,R39,R43,R4
    C49678          100      60  100nF 16V          C11,C12,C14,C15,C16,C18,C22,C23,C30,C31,C32,C5
+   C17414          100      50  10k                R19,R20,R21,R22,R23,R25,R28,R32,R34,R6
    C149504         100      40  100k               R1,R13,R15,R2,R29,R56,R57,R58
    C408389          50      35  BAT54S             D11,D13,D15,D17,D19,D20,D7
    C17513          100      35  1k                 R14,R37,R41,R45,R49,R53,R8
    C13967          100      25  470nF 50V          C25,C26,C27,C28,C29
    C134976          26      25  SMAJ26CA-13-F      D1,D5,D6,D8,D9
    C223989          26      25  SMAJ40CA           D10,D12,D14,D16,D18
-   C17520          100      25  2.2k               R40,R44,R48,R52,R55
+   C856630         100      25  10k 0.1%           R39,R43,R47,R51,R54
+   C865368         100      25  2.21k 0.1%         R40,R44,R48,R52,R55
    C17634          100      20  33                 R11,R16,R17,R18
    C72998          100      20  60.4               R26,R27,R35,R36
    C2930178        100      20  2.49k              R38,R42,R46,R50
@@ -55,7 +56,7 @@ Parts order for 5 boards
    C626759           6       5  MCP2518FDT-H/SL    U6
    C5186937          6       5  TX322540M4FBCE2T   Y1
 
-   47 distinct parts, 3332 pieces after MOQ rounding
+   48 distinct parts, 3432 pieces after MOQ rounding
    LCSC enforces the true per-part minimum at checkout, so
    anything undercalled here is bumped there, not rejected.
 
