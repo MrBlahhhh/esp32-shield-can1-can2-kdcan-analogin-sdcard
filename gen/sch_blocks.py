@@ -344,55 +344,348 @@ FRONTEND = {
 }
 
 
-CAN = {
-    # The transceiver, then the bus, drawn as a bus: CANH along the top and
-    # CANL along the bottom, with the common-mode choke, the transient
-    # clamps, the split termination and the test points hanging between them
-    # in the order the signal meets them.
+def can_bus(sheet, tx, rx, sel, ht, lt, h, l, term, term_a, split,
+            clamps=True, testpoints=True):
+    """One CAN channel: transceiver, choke, clamps, split termination.
+
+    Drawn as a bus -- CANH along the top and CANL along the bottom, with the
+    common-mode choke, the transient clamps, the split termination and the
+    test points hanging between them in the order the signal meets them.
+
+    Both channels on this board are this circuit. The second one differs
+    only at the far end: its clamps and test point sit on the AUX pair after
+    the jumpers rather than on the bus itself, so it is drawn without them.
+    """
+    parts = [
+        # value            nets                        dx      dy   rot
+        ("100nF",  {"+5V", "GND"},                  -10.16, -20.32,   0),
+        ("100nF",  {"+3V3", "GND"},                 -20.32, -20.32,   0),
+        ("10k",    {sel, "GND"},                    -22.86,   8.89,   0),
+        ("51uH",   {ht, h, lt, l},                   30.48,   0.00,   0),
+        (term,     {h, term_a},                      53.34,  -8.89, 270),
+        ("60.4",   {term_a, split},                  53.34,   1.27,   0),
+        ("60.4",   {split, l},                       53.34,  12.70,   0),
+        ("4.7nF",  {split, "GND"},                   60.96,   8.89,   0),
+    ]
+    junctions = [(53.34, -12.70), (53.34, 20.32)]
+    # A wire end needs something on it. With test points the bus runs on to
+    # them; without, the label goes on the end instead. The run stays the
+    # same length either way -- stopping it at 60.96 put the end exactly on
+    # the split capacitor's ground stub and shorted CAN2_L_C to GND.
+    out = 68.58
+    if clamps:
+        parts += [("SMAJ26CA", {h, "GND"},           43.18,  -8.89, 270),
+                  ("SMAJ26CA", {l, "GND"},           43.18,  24.13, 270)]
+        junctions += [(43.18, -12.70), (43.18, 20.32)]
+    if testpoints:
+        parts += [(h, {h},                           68.58, -12.70,   0),
+                  (l, {l},                           68.58,  20.32, 180)]
+    return {
+        "sheet": sheet,
+        "anchor": ("TJA1051T/3", {tx, rx, sel, ht, lt, "GND", "+5V", "+3V3"}),
+        "anchor_rot": 0,
+        "parts": parts,
+        "wires": [
+            [(12.70, -2.54), (25.40, -2.54)],                     # to the choke
+            [(12.70, 2.54), (25.40, 2.54)],
+            [(35.56, -2.54), (40.64, -2.54), (40.64, -12.70),
+             (out, -12.70)],                                      # CANH out
+            [(35.56, 2.54), (40.64, 2.54), (40.64, 20.32),
+             (out, 20.32)],                                       # CANL out
+            [(-12.70, 5.08), (-22.86, 5.08)],                     # mode select
+            [(53.34, -5.08), (53.34, -2.54)],                     # jumper to 60R
+            [(53.34, 5.08), (53.34, 8.89)],                       # split node
+            [(53.34, 5.08), (60.96, 5.08)],                       # split cap
+            [(53.34, 16.51), (53.34, 20.32)],                     # 60R to CANL
+        ],
+        "junctions": junctions,
+        "labels": {
+            ht: (14.61, -2.54, 0),
+            lt: (14.61, 2.54, 0),
+            sel: (-16.51, 5.08, 180),
+            term_a: (53.34, -3.81, 0),
+            split: (55.88, 5.08, 0),
+            h: (46.99, -12.70, 0) if testpoints else (out, -12.70, 0),
+            l: (46.99, 20.32, 0) if testpoints else (out, 20.32, 0),
+        },
+    }
+
+
+CAN = can_bus("CAN + K-line", "CAN_TX", "CAN_RX", "CAN_S", "CANH_T", "CANL_T",
+              "CAN_H", "CAN_L", "TERM", "TERM_A", "CAN_SPLIT")
+
+# The second channel's clamps and test point live on AUX_A/AUX_B, after the
+# jumpers that choose between this bus and K-line -- see AUXSEL below.
+CAN2 = can_bus("CAN + K-line", "CAN2_TXD", "CAN2_RXD", "CAN2_S", "CAN2H_T",
+               "CAN2L_T", "CAN2_H_C", "CAN2_L_C", "TERM2", "TERM2_A",
+               "CAN2_SPLIT", clamps=False, testpoints=False)
+
+
+# The SPI CAN controller. The ESP32-S3 has exactly one TWAI, so the second
+# channel needs its own controller and this is the drawing that goes with it.
+# Crystal out to the left where OSC1 and OSC2 are, load caps standing above
+# it with their grounds at the top so the run below the crystal stays clear
+# for OSC1 to reach the far pin without crossing OSC2. The SPI four and the
+# interrupt keep their labels: they cross to the MCU sheet and there is
+# nothing on this sheet to wire them to.
+MCP2518 = {
     "sheet": "CAN + K-line",
-    "anchor": ("TJA1051T/3", None),
+    "anchor": ("MCP2518FD", None),
+    "anchor_rot": 0,
     "parts": [
-        # value                nets                        dx      dy   rot
-        ("100nF",  {"+5V", "GND"},                      -10.16, -20.32,   0),
-        ("100nF",  {"+3V3", "GND"},                     -20.32, -20.32,   0),
-        ("10k",    {"CAN_S", "GND"},                    -17.78,   8.89,   0),
-        ("51uH", {"CANH_T", "CAN_H", "CANL_T", "CAN_L"},
-                                                         25.40,   0.00,   0),
-        ("SMAJ26CA", {"CAN_H", "GND"},                   43.18,  -8.89, 270),
-        ("SMAJ26CA", {"CAN_L", "GND"},                   43.18,  24.13, 270),
-        ("TERM", {"CAN_H", "TERM_A"},       53.34,  -8.89, 270),
-        ("60.4",   {"TERM_A", "CAN_SPLIT"},              53.34,   1.27,   0),
-        ("60.4",   {"CAN_SPLIT", "CAN_L"},               53.34,  12.70,   0),
-        ("4.7nF",  {"CAN_SPLIT", "GND"},                 60.96,   8.89,   0),
-        ("CAN_H",  {"CAN_H"},                            68.58, -12.70,   0),
-        ("CAN_L",  {"CAN_L"},                            68.58,  20.32, 180),
+        # value      nets                       dx      dy   rot
+        ("100nF",  {"+3V3", "GND"},           -7.62, -22.86,   0),
+        ("1uF",    {"+3V3", "GND"},          -17.78, -22.86,   0),
+        # The crystal group sits BELOW the chip, level with OSC1 and OSC2 and
+        # clear of the SPI pins above them. First attempt put it level with
+        # the chip's middle, where the four SPI stubs run out to their labels
+        # -- the load capacitors printed straight through CAN2_MISO and
+        # CAN2_CS, and their ground symbols stacked on each other.
+        ("40MHz",  {"XTAL1", "XTAL2", "GND"}, -27.94,  20.32,   0),
+        ("15pF",   {"XTAL2", "GND"},          -24.13,  33.02,   0),
+        ("15pF",   {"XTAL1", "GND"},          -31.75,  33.02,   0),
     ],
     "wires": [
-        [(12.70, -2.54), (20.32, -2.54)],                     # to the choke
-        [(12.70, 2.54), (20.32, 2.54)],
-        [(30.48, -2.54), (35.56, -2.54), (35.56, -12.70),
-         (68.58, -12.70)],                                    # CANH out
-        [(30.48, 2.54), (35.56, 2.54), (35.56, 20.32),
-         (68.58, 20.32)],                                     # CANL out
-        [(-12.70, 5.08), (-17.78, 5.08)],                     # mode select
-        [(53.34, -5.08), (53.34, -2.54)],                     # jumper to 60R
-        [(53.34, 5.08), (53.34, 8.89)],                       # split node
-        [(53.34, 5.08), (60.96, 5.08)],                       # split cap
-        [(53.34, 16.51), (53.34, 20.32)],                     # 60R to CANL
+        [(-24.13, 20.32), (-24.13, 29.21)],               # crystal pin 3 down
+        [(-31.75, 20.32), (-31.75, 29.21)],               # crystal pin 1 down
+        [(-15.24, 5.08), (-20.32, 5.08), (-20.32, 24.13),
+         (-24.13, 24.13)],                                # OSC2
+        # OSC1 has to reach the far crystal pin without crossing OSC2, so it
+        # goes right round underneath the load capacitors.
+        [(-15.24, 7.62), (-17.78, 7.62), (-17.78, 49.53),
+         (-38.10, 49.53), (-38.10, 24.13), (-31.75, 24.13)],
     ],
-    "junctions": [(43.18, -12.70), (53.34, -12.70),
-                  (43.18, 20.32), (53.34, 20.32)],
+    "junctions": [(-24.13, 24.13), (-31.75, 24.13)],
     "labels": {
-        "CANH_T": (14.61, -2.54, 0),
-        "CANL_T": (14.61, 2.54, 0),
-        "CAN_S": (-16.51, 5.08, 180),
-        "TERM_A": (53.34, -3.81, 0),
-        "CAN_SPLIT": (55.88, 5.08, 0),
-        "CAN_H": (38.10, -12.70, 0),
-        "CAN_L": (38.10, 20.32, 0),
+        "XTAL2": (-22.86, 24.13, 0),
+        "XTAL1": (-38.10, 35.56, 90),
     },
 }
 
+
+# Which pair the aux connector carries: the second CAN bus, or K-line. The
+# jumpers choose, and the clamps and the test point sit AFTER them, because
+# whatever is selected is what actually leaves the board.
+AUXSEL = {
+    "sheet": "CAN + K-line",
+    "anchor": ("AUXSEL", None),
+    "anchor_rot": 0,
+    "parts": [
+        # value        nets                        dx      dy   rot
+        # The B leg sits 33 mm down, not 23. At 23 the A clamp's ground stub
+        # ran from its cathode straight through the B leg on its way to the
+        # ground symbol, and ERC merged CAN2_L_C into GND. The clamp needs
+        # its whole stub above the next wire, not most of it.
+        ("AUXCL",    {"AUX_B", "CAN2_L_C"},      0.00,  33.02, 180),
+        ("SMAJ26CA", {"AUX_A", "GND"},          10.16,  12.70, 270),
+        ("SMAJ26CA", {"AUX_B", "GND"},          13.97,  36.83, 270),
+        ("AUX_A",    {"AUX_A"},                 20.32,   8.89,   0),
+    ],
+    "wires": [
+        [(0.00, 3.81), (0.00, 8.89), (20.32, 8.89)],      # A leg, past its clamp
+        [(3.81, 33.02), (20.32, 33.02)],                  # B leg, same
+    ],
+    "junctions": [(10.16, 8.89), (13.97, 33.02)],
+    "labels": {
+        # AUX_A leaves the sheet, so it needs a name on this side of the
+        # hierarchy even though a test point already sits on the wire.
+        "AUX_A": (5.08, 8.89, 0),
+        "AUX_B": (20.32, 33.02, 0),
+    },
+}
+
+# The K-line driver, read the way it works: K_TX into the gate through its
+# series resistor with a pull-down holding the FET off, the drain pulling the
+# bus down through the 20 ohm, the 22k/10k divider bringing the bus back to a
+# 3.3 V receive pin with a clamp on it, and the 750 pull-up on its jumper
+# hanging off the bus at the far end.
+KLINE = {
+    "sheet": "CAN + K-line",
+    "anchor": ("2N7002", {"K_TX_G", "GND", "K_TX_D"}),
+    "anchor_rot": 0,
+    "parts": [
+        # value      nets                           dx      dy   rot
+        ("10k",    {"K_TX", "K_TX_G"},           -19.05,   0.00,  90),
+        ("100k",   {"K_TX_G", "GND"},             -8.89,   8.89,   0),
+        # 180: pin 1 is K_TX_D and has to face the drain below it,
+        # pin 2 is K_LINE and has to reach the bus above.
+        ("20",     {"K_TX_D", "K_LINE"},           2.54, -16.51, 180),
+        ("22k",    {"K_LINE", "K_RX"},            12.70, -13.97,   0),
+        ("10k",    {"K_RX", "GND"},               12.70,  -2.54,   0),
+        # Rotated 180 so the common cathode/anode node faces up onto the
+        # receive line and the two rails leave sideways.
+        ("BAT54S", {"GND", "+3V3", "K_RX"},       25.40,  -3.81, 180),
+        ("KPU",    {"OBD_VBAT_F", "K_PU"},        22.86, -35.56, 270),
+        ("750",    {"K_PU", "K_LINE"},            22.86, -22.86,   0),
+        ("K_LINE", {"K_LINE"},                    33.02, -20.32,   0),
+    ],
+    "wires": [
+        [(-15.24, 0.00), (-5.08, 0.00)],                  # gate series to G
+        [(-8.89, 0.00), (-8.89, 5.08)],                   # gate pull-down
+        [(2.54, -5.08), (2.54, -12.70)],                  # drain up to the 20R
+        [(2.54, -20.32), (33.02, -20.32)],                # the bus
+        [(12.70, -20.32), (12.70, -17.78)],               # divider off the bus
+        [(12.70, -10.16), (12.70, -6.35)],                # divider mid
+        [(12.70, -8.89), (25.40, -8.89)],                 # receive to the clamp
+        [(22.86, -31.75), (22.86, -26.67)],               # jumper to the 750
+    ],
+    "junctions": [(-8.89, 0.00), (12.70, -20.32), (12.70, -8.89),
+                  (22.86, -20.32)],
+    "labels": {
+        "K_TX_G": (-6.35, 0.00, 180),
+        "K_TX_D": (2.54, -8.89, 90),
+        "K_RX": (14.61, -8.89, 0),
+        "K_PU": (22.86, -29.21, 0),
+        "K_LINE": (27.94, -20.32, 0),
+    },
+}
+
+
+# Where the loom lands: the 12 V sense line in through the polyfuse, clamped
+# and decoupled on the far side. CAN_H and CAN_L pass straight through to
+# their own sheet.
+PWRIN = {
+    "sheet": "Rails + harness",
+    "anchor": ("CAN1 + power harness", None),
+    "anchor_rot": 180,
+    "parts": [
+        # value        nets                        dx      dy   rot
+        ("0.2A PTC", {"OBD_VBAT", "OBD_VBAT_F"},  17.78,   2.54,  90),
+        ("SMAJ26CA", {"OBD_VBAT_F", "GND"},       29.21,   6.35, 270),
+        ("100nF",    {"OBD_VBAT_F", "GND"},       36.83,   6.35,   0),
+    ],
+    "wires": [
+        [(5.08, 2.54), (13.97, 2.54)],                    # pin 1 to the fuse
+        [(21.59, 2.54), (44.45, 2.54)],                   # protected rail
+    ],
+    "junctions": [(29.21, 2.54), (36.83, 2.54)],
+    "labels": {
+        "OBD_VBAT": (11.43, 2.54, 180),
+        "OBD_VBAT_F": (44.45, 2.54, 0),
+    },
+}
+
+
+# Both ADCs and the I2C bus that joins them. 0x48 takes the four scaled
+# channels, 0x49 takes the fourth plus the two spare differential inputs;
+# SDA and SCL run down the right from one to the other, which is the whole
+# reason to draw them as a pair rather than as two islands.
+#
+# The two bus wires cross once. That is not a mistake and it cannot be
+# avoided by routing: SCL sits above SDA at both chips, so any pair of
+# nested paths between them interleaves. A crossing with no junction on it
+# is not a connection, and a schematic that never crosses a wire is a
+# schematic that has been contorted to avoid it.
+ADSPAIR = {
+    "sheet": "Analog Inputs",
+    "anchor": ("ADS1115 (0x48)", None),
+    "anchor_rot": 0,
+    "parts": [
+        # value              nets                          dx      dy   rot
+        ("ADS1115 (0x49)", None,                          0.00,  40.64,   0),
+        # Rotated 180 so the pull-down stands above its line and leaves the
+        # run below it clear for the second spare input.
+        ("100k",           {"AIN_SP1", "GND"},          -20.32,  36.83, 180),
+        ("100k",           {"AIN_SP2", "GND"},          -27.94,  46.99,   0),
+    ],
+    "wires": [
+        [(10.16, 0.00), (25.40, 0.00), (25.40, 40.64), (10.16, 40.64)],   # SCL
+        [(10.16, 2.54), (20.32, 2.54), (20.32, 43.18), (10.16, 43.18)],   # SDA
+        [(-10.16, 40.64), (-20.32, 40.64)],               # spare 1 pull-down
+        [(-10.16, 43.18), (-27.94, 43.18)],               # spare 2 pull-down
+    ],
+    "junctions": [],
+    "labels": {
+        # On the wires themselves -- 2.54 off and KiCad calls them floating.
+        "I2C_SCL": (25.40, 20.32, 90),
+        "I2C_SDA": (20.32, 25.40, 90),
+        "AIN_SP1": (-13.97, 40.64, 180),
+        "AIN_SP2": (-15.24, 43.18, 180),
+    },
+}
+
+
+# Battery sense: a 100k/8.2k divider off the fused 12 V line with the
+# anti-alias cap and the clamp on the tap.
+VBATSENSE = {
+    "sheet": "Analog Inputs",
+    "anchor": ("100k", {"OBD_VBAT", "VBAT_SNS"}),
+    "anchor_rot": 0,
+    "parts": [
+        # value      nets                          dx      dy   rot
+        ("8.2k",   {"VBAT_SNS", "GND"},          0.00,  11.43,   0),
+        ("100nF",  {"VBAT_SNS", "GND"},         10.16,  11.43,   0),
+        ("BAT54S", {"GND", "+3V3", "VBAT_SNS"}, 20.32,  10.16, 180),
+    ],
+    "wires": [
+        [(0.00, 3.81), (0.00, 7.62)],                     # divider mid
+        [(0.00, 5.08), (20.32, 5.08)],                    # tap out to the clamp
+        [(10.16, 5.08), (10.16, 7.62)],                   # filter cap
+    ],
+    "junctions": [(0.00, 5.08), (10.16, 5.08)],
+    "labels": {
+        "VBAT_SNS": (2.54, 5.08, 0),
+    },
+}
+
+# The sensor return, drawn as a fifth channel because that is what it is.
+#
+# Differential ground works by putting the return leg through an attenuator
+# matched to the four signal legs, so whatever offset the sensor's ground has
+# picked up on its way back divides by the same ratio and subtracts out at
+# the ADC. Same parts, same geometry as channel(n) -- only the pull-up branch
+# is missing, because a return line has nothing to pull up to.
+SENSERTN = {
+    "sheet": "Analog Inputs",
+    "anchor": ("1k", {"SENS_RTN", "AGND_A"}),
+    "anchor_rot": 90,
+    "parts": [
+        # value       nets                        dx      dy   rot
+        ("SMAJ40CA", {"SENS_RTN", "GND"},      -12.70,   3.81, 270),
+        ("10k",      {"AGND_A", "AGND_SENSE"},  26.67,   0.00,  90),
+        ("2.21k",    {"AGND_SENSE", "GND"},     35.56,   7.62,   0),
+        ("470nF",    {"AGND_SENSE", "GND"},     45.72,   7.62,   0),
+        ("BAT54S", {"GND", "+3V3", "AGND_SENSE"},
+                                                40.64, -16.51,   0),
+    ],
+    "wires": [
+        [(-20.32, 0.00), (-3.81, 0.00)],      # harness in, clamped
+        [(3.81, 0.00), (22.86, 0.00)],        # after the series resistor
+        [(30.48, 0.00), (45.72, 0.00)],       # the ADC node
+        [(35.56, 0.00), (35.56, 3.81)],       # divider lower leg
+        [(45.72, 0.00), (45.72, 3.81)],       # filter cap
+        [(40.64, -11.43), (40.64, 0.00)],     # clamp
+    ],
+    "junctions": [(-12.70, 0.00), (35.56, 0.00), (40.64, 0.00),
+                  (45.72, 0.00)],
+    "labels": {
+        "SENS_RTN": (-20.32, 0.00, 0),
+        "AGND_A": (16.51, 0.00, 0),
+        "AGND_SENSE": (31.75, 0.00, 0),
+    },
+}
+
+
+# The supercapacitor charge path: 100 ohms to limit inrush when the rail
+# comes up, and the Schottky across it so the stored charge comes back out
+# without going through the resistor. Two parts, in parallel, and drawing
+# them as a pair is the only way that reads.
+SCAPCHG = {
+    "sheet": "Rails + harness",
+    "anchor": ("100", {"+5V", "SCAP_TOP"}),
+    "anchor_rot": 90,
+    "parts": [
+        # value   nets                     dx      dy   rot
+        ("SS14", {"+5V", "SCAP_TOP"},    0.00,  10.16,   0),
+    ],
+    "wires": [
+        [(3.81, 0.00), (10.16, 0.00), (10.16, 10.16), (3.81, 10.16)],
+    ],
+    "junctions": [],
+    "labels": {
+        "SCAP_TOP": (10.16, 5.08, 90),
+    },
+}
 
 SDCARD = {
     # The card sits on the right and everything feeding it reads right to
@@ -401,6 +694,7 @@ SDCARD = {
     # with the card pins they damp.
     "sheet": "SD Card",
     "anchor": ("microSD push-pull", None),
+    "anchor_rot": 0,
     "parts": [
         # value      nets                          dx      dy   rot
         ("DMG2301L", {"SD_PG", "+3V3", "SD_VDD"},
@@ -433,7 +727,9 @@ SDCARD = {
         ("33",       {"SD_CMD", "SD_CMD_C"},    -57.15, -10.16,  90),
         ("33",       {"SD_CLK", "SD_CLK_C"},    -57.15,   0.00,  90),
         ("33",       {"SD_D0", "SD_D0_C"},      -57.15,  10.16,  90),
-        ("47k",      {"+3V3", "SD_CD"},         -57.15,  25.40,   0),
+        ("47k",      {"+3V3", "SD_CD"},         -57.15,  25.40,  90),
+        ("SD_CLK",   {"SD_CLK_C"},              -40.64,   0.00,   0),
+        ("SD_CMD",   {"SD_CMD_C"},              -30.48,  -5.08,   0),
     ],
     "wires": [
         [(-74.93, -68.58), (-96.52, -68.58), (-96.52, -10.16)],  # switched rail
@@ -442,14 +738,35 @@ SDCARD = {
         # The enable pull-down sits with its top pin on this wire, so the
         # junction is the whole connection -- no stub to draw.
         [(-69.85, -63.50), (-62.23, -63.50)],                    # enable
+        # Each terminator through to the card pin it damps. The card's pins
+        # are on a 2.54 pitch and the resistors on 10.16, so two of the three
+        # take a jog; CLK lines up and runs straight.
+        [(-53.34, -10.16), (-38.10, -10.16), (-38.10, -5.08),
+         (-22.86, -5.08)],                                       # CMD
+        [(-53.34, 0.00), (-22.86, 0.00)],                        # CLK
+        [(-53.34, 10.16), (-33.02, 10.16), (-33.02, 5.08),
+         (-22.86, 5.08)],                                        # DAT0
+        # Card-detect pull-up round to pin 9.
+        [(-53.34, 25.40), (-45.72, 25.40), (-45.72, 12.70),
+         (-22.86, 12.70)],
     ],
     "junctions": [(-60.96, -73.66), (-66.04, -63.50),
+                  (-40.64, 0.00), (-30.48, -5.08),
                   (-96.52, -67.31), (-96.52, -57.15), (-96.52, -50.80),
                   (-96.52, -40.64), (-96.52, -30.48), (-96.52, -20.32)],
     "labels": {
         "SD_PG": (-58.42, -73.66, 0),
         "SD_EN_G": (-68.58, -63.50, 180),
         "SD_VDD": (-96.52, -55.88, 0),
+        # The card lines now have wire between the terminator and the pin, and
+        # a wire with no name on it is a net of its own: the pull-ups and the
+        # protection array are still joined to these by label, so the name has
+        # to be on the drawn run or the net splits in two. KiCad called the
+        # halves Net-(J8-CLK), Net-(J8-CMD), Net-(J8-DAT0) and Net-(J8-DET).
+        "SD_CMD_C": (-48.26, -10.16, 0),
+        "SD_CLK_C": (-48.26, 0.00, 0),
+        "SD_D0_C": (-48.26, 10.16, 0),
+        "SD_CD": (-50.80, 25.40, 0),
     },
 }
 
@@ -702,7 +1019,9 @@ UTILITY = {
 
 
 BLOCKS = ([channel(n) for n in (1, 2, 3, 4)]
-          + [CAN, SDCARD, WS2812, RIDETHRU, QWIIC, UTILITY])
+          + [CAN, CAN2, MCP2518, AUXSEL, KLINE, PWRIN, ADSPAIR,
+             VBATSENSE, SENSERTN, SCAPCHG, SDCARD, WS2812,
+             RIDETHRU, QWIIC, UTILITY])
 # Gone, with the parts they drew:
 #
 #   buck x2, FRONTEND, SENSW   the whole 12 V power section. The dev board

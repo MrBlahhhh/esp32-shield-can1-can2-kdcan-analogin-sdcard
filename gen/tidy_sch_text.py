@@ -335,6 +335,11 @@ def slide_candidates(lx, ly, wires, margin=1.27):
     Only along the segment, only on the grid, and never within `margin` of
     an endpoint -- a label parked exactly on a junction or a pin reads as
     belonging to the wrong thing even when the connectivity is right.
+
+    1.27 and not more: widening it to clear the pin number as well took away
+    so many candidate positions that the count went UP, from 12 to 18. Where
+    a label genuinely has no room the fix is a longer wire in the block, not
+    a stricter rule here.
     """
     out, seen = [], set()
     for x1, y1, x2, y2 in wires:
@@ -342,6 +347,8 @@ def slide_candidates(lx, ly, wires, margin=1.27):
         horizontal = abs(y1 - y2) < 0.02
         if vertical and abs(lx - x1) < 0.02 and min(y1, y2) - 0.02 <= ly <= max(y1, y2) + 0.02:
             lo, hi = min(y1, y2) + margin, max(y1, y2) - margin
+            if hi < lo:
+                continue        # shorter than two margins: nowhere to go
             n = int((hi - lo) / STEP) + 1
             for k in range(n + 1):
                 d = round(lo + k * STEP - ly, 4)
@@ -350,6 +357,8 @@ def slide_candidates(lx, ly, wires, margin=1.27):
                     out.append((0.0, d))
         elif horizontal and abs(ly - y1) < 0.02 and min(x1, x2) - 0.02 <= lx <= max(x1, x2) + 0.02:
             lo, hi = min(x1, x2) + margin, max(x1, x2) - margin
+            if hi < lo:
+                continue        # shorter than two margins: nowhere to go
             n = int((hi - lo) / STEP) + 1
             for k in range(n + 1):
                 d = round(lo + k * STEP - lx, 4)

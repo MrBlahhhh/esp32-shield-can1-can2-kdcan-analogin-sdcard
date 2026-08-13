@@ -1777,6 +1777,16 @@ def apply_blocks(libs, sh):
         if anchor is None:
             continue
         BLOCKS_PLACED.add(id(blk))
+        # The anchor's rotation is the block's business too. It used to keep
+        # whatever the packer gave it, so every wire drawn to an anchor pin
+        # was betting on that default -- and a connector that came out at 0
+        # instead of 180 put its pins on the opposite side of the symbol from
+        # the wire waiting for them. Three dangling endpoints and an ERC
+        # error, from a coordinate table that was itself correct.
+        if "anchor_rot" in blk:
+            anchor["theta"] = blk["anchor_rot"]
+            anchor["ext"] = symbol_extent(libs, anchor["lib_id"],
+                                          blk["anchor_rot"])
         anchor["_block"] = True
         anchor["_own_ext"] = anchor["ext"]
         pin_clearance(libs, anchor)

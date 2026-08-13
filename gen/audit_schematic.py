@@ -334,30 +334,53 @@ def wire_groups(wires):
     return {p: find(p) for p in parent}
 
 
-def label_only(symbols, wires):
-    """Symbols joined to no other symbol by drawn wire.
+def label_only(symbols, wires, power=()):
+    """Symbols the reader has to join up in their own head.
 
-    A symbol with no pins at all -- a mounting hole, a logo, a fiducial --
-    is not connectivity and is not counted either way.
+    A symbol is counted when no pin of it reaches another symbol along drawn
+    wire AND at least one pin ends in a bare net label. Two exclusions, both
+    deliberate:
+
+      * A symbol with no pins -- a mounting hole, a logo, a fiducial -- is
+        not connectivity and is not counted either way.
+
+      * A pin that ends on a POWER SYMBOL is drawn, not named. A decoupling
+        capacitor with +3V3 above it and GND below is exactly how a person
+        draws a decoupling capacitor; calling it orphaned because neither
+        neighbour is a signal part made the number meaningless -- it counted
+        59 symbols when the drawing had 48 real problems, and the 11 it was
+        wrong about were the ones already drawn correctly.
+
+    What is left is the real complaint: a part sitting in open space with a
+    name at each end and no line to follow.
     """
     groups = wire_groups(wires)
-    owner = {}
+    owner, powered = {}, {}
     for ref, lib_id, pins in symbols:
         for px, py in pins:
             g = groups.get(key(px, py))
             if g is not None:
                 owner.setdefault(g, set()).add(ref)
+    for px, py in power:
+        g = groups.get(key(px, py))
+        if g is not None:
+            powered[g] = True
     loose = []
     for ref, lib_id, pins in symbols:
         if not pins:
             continue
-        joined = False
+        wired = labelled = 0
         for px, py in pins:
             g = groups.get(key(px, py))
-            if g is not None and len(owner.get(g, ())) > 1:
-                joined = True
-                break
-        if not joined:
+            if g is None:
+                labelled += 1
+            elif len(owner.get(g, ())) > 1:
+                wired += 1
+            elif powered.get(g):
+                pass
+            else:
+                labelled += 1
+        if not wired and labelled:
             loose.append((ref, lib_id))
     return loose
 
@@ -385,7 +408,9 @@ def main():
 
         real = [(sym[3], sym[0], sym[4]) for sym in symbols
                 if not sym[0].startswith("power:")]
-        loose = label_only(real, wires)
+        rails = [p for sym in symbols if sym[0].startswith("power:")
+                 for p in sym[4]]
+        loose = label_only(real, wires, rails)
 
         total_overlap += len(clashes)
         total_sym += len([sym for sym in real if sym[2]])
