@@ -13,3 +13,4 @@ sim/*.dat
 .build/
 sim/fw/
 firmware/**/.pio/
+.build_board.lock

@@ -33,7 +33,7 @@ python gen/export_plots.py        # schematic.pdf + three board renders
 | `sch_blocks.py` | hand-drawn schematic layouts for every recurring circuit — coordinates only, no electrical content |
 | `generate_pcb.py` | board outline, placement zones, fixed placements (`FIXED`, `BUCK_FIXED`, `PIN_FIXED`), planes, keepouts |
 | `build_board.py` | the 10-stage build driver, with a lock so two builds cannot fight |
-| `route_bucks.py` | hand-shaped copper for the switching loops |
+| `route_bucks.py` | hand-shaped copper for switching loops. **Not run on this board** — the converters went with the power section, `BUCK_FIXED` is empty, and `build_board.py` skips the stage. Kept for the next design that has one |
 | `finish_routing.py` | ties for duplicated connector pins (runs before AND after autorouting) |
 | `stitch_planes.py` | a via from every GND/+3V3 pad to its plane, with hole-collision checks |
 | `maze_route.py` | rip-up-and-retry router for whatever freerouting leaves open |

@@ -40,7 +40,7 @@ import generate_schematic as sch  # noqa: E402
 # ------------------------------------------------------------------ setup ----
 
 BOARD_W = 98.0
-BOARD_H = 90.0
+BOARD_H = 100.0
 # The carrier is organised around the two sockets the dev board drops into,
 # and they dominate everything. Each is 22 through-holes on a 2.54 mm pitch,
 # so each cuts a 53.3 mm slot through every inner layer -- see the socket map
@@ -187,8 +187,12 @@ FIXED = {
     # the connector quietly fell through to the zone packer and was placed
     # in the middle of the board. Renaming a part renames its FIXED key.
     "JST B10B-PH-K-S(LF)(SN)":  (12.0, 6.5, 0),     # sensor harness, top left
-    "JST B8B-PH-K-S(LF)(SN)":   (70.0, 6.5, 0),     # OBD harness, top right
-    "Hirose DM3D-SF":           (17.0, 81.0, 0),    # bottom edge, card out
+    # Two 4-way plugs, keyed by value because they share an MPN. Each sits
+    # beside the circuit it feeds rather than next to the other one -- see
+    # the note on the connectors in gen/generate_schematic.py.
+    "value:CAN1 + power harness": (4.0, 66.0, 90),   # left edge, by U5
+    "value:Aux bus harness":      (68.0, 6.5, 0),    # top right, by U6/U7
+    "Hirose DM3D-SF":           (17.0, 87.0, 0),    # bottom edge, card out
 
     # Headers on the free edges. The dev board covers the middle of this
     # board end to end, so nothing can present a connector there.
@@ -206,12 +210,17 @@ FIXED = {
 # hand at the right edge rather than let loose on a shelf packer -- and away
 # from the dev board, which sits about 7 mm above the laminate.
 PIN_FIXED = [
+    # The bypass capacitors used to be pinned here by hand. They are not any
+    # more -- zone_for() places a rail-only capacitor with whatever it was
+    # declared under, which puts each bypass beside its own IC without any
+    # coordinates that go stale when the packer moves something.
+
     # sheet,             value,   nets,                     x,    y,  rot
     # Bottom-right corner, below the dev board and as far from it as the
     # outline allows -- 8 mm cans beside a board sitting 8.5 mm up on sockets
     # is asking for one to foul the other during assembly.
-    ("Rails + harness", "1F 2.7V", {"SCAP_TOP", "SCAP_MID"}, (72.0, 78.0, 0)),
-    ("Rails + harness", "1F 2.7V", {"SCAP_MID", "GND"},      (83.0, 78.0, 0)),
+    ("Rails + harness", "1F 2.7V", {"SCAP_TOP", "SCAP_MID"}, (72.0, 92.0, 0)),
+    ("Rails + harness", "1F 2.7V", {"SCAP_MID", "GND"},      (83.0, 92.0, 0)),
 ]
 
 # Nothing left to hand-shape: the two LM5164 islands went with the power
@@ -226,7 +235,7 @@ BUCK_FIXED = []
 # bottom pair 6 mm out of line with the top -- which is neither symmetric
 # nor useful.  4 mm is set by H1: any further in and its keepout ring eats
 # into J7, and the top header row has no slack to give.
-HOLES = [(4.0, 4.0), (4.0, 86.0), (94.0, 4.0), (94.0, 86.0)]
+HOLES = [(4.0, 4.0), (4.0, 96.0), (94.0, 4.0), (94.0, 96.0)]
 
 # How much of a zone's spare height may go between its rows.  Silkscreen
 # reference text is 0.8 mm, so a millimetre on top of the 0.4 mm packing gap
@@ -245,10 +254,9 @@ ZONES = [
     # row along the bottom edge instead, between the microSD socket and the
     # hold-up cells. This predicate is FIRST so it wins over whatever zone
     # the probed net would otherwise have put them in.
-    ("testpoints", (28.0, 78.0, 36.0,  4.0), lambda p, n, s: p["prefix"] == "TP"),
+    ("testpoints", (28.0, 83.0, 36.0,  4.0), lambda p, n, s: p["prefix"] == "TP"),
 
     # ---- left strip: everything that hangs off the J1 socket row ----------
-    ("harness",   ( 2.0,  2.0, 35.0,  9.0), lambda p, n, s: p["prefix"] == "J" and s == "Analog Inputs"),
     ("ch1",       ( 2.0, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN1_A", "AIN1_PU", "AIN1_IN", "AIN1"}),
     ("ch2",       (10.9, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN2_A", "AIN2_PU", "AIN2_IN", "AIN2"}),
     ("ch3",       (19.8, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN3_A", "AIN3_PU", "AIN3_IN", "AIN3"}),
@@ -258,18 +266,21 @@ ZONES = [
     # same thermal environment. Placed beside them for that reason.
     ("agnd",      ( 2.0, 44.0, 16.0,  8.0), lambda p, n, s: n & {"SENS_RTN", "AGND_A", "AGND_SENSE"}),
     ("adc",       (18.5, 44.0, 18.5,  8.0), lambda p, n, s: p["mpn"] == "ADS1115IDGSR" or n & {"AIN_SP1", "AIN_SP2"} or (s == "Analog Inputs" and n <= {"+3V3", "GND"})),
-    ("vbatsns",   ( 2.0, 53.0,  8.0,  7.0), lambda p, n, s: "VBAT_SNS" in n),
-    ("can1",      (10.5, 53.0, 26.5, 11.0), lambda p, n, s: s == "CAN + K-line" and n & {"CAN_H", "CAN_L", "CANH_T", "CANL_T", "CAN_TX", "CAN_RX", "CAN_S", "TERM_A", "CAN_SPLIT"}),
-    ("sd",        ( 2.0, 65.0, 35.0, 12.0), lambda p, n, s: s == "SD Card"),
+    # Battery sense moved under the dev board: four flat parts on a DC
+    # line, and the left edge they used to hold is where the CAN1 plug
+    # has to sit to be near its transceiver.
+    ("vbatsns",   (42.5, 66.0, 17.9,  6.0), lambda p, n, s: "VBAT_SNS" in n),
+    ("can1",      (14.0, 54.0, 23.0, 13.0), lambda p, n, s: s == "CAN + K-line" and n & {"CAN_H", "CAN_L", "CANH_T", "CANL_T", "CAN_TX", "CAN_RX", "CAN_S", "TERM_A", "CAN_SPLIT"}),
+    ("sd",        ( 9.0, 68.0, 28.0, 12.0), lambda p, n, s: s == "SD Card"),
 
     # ---- right strip: the J3 row -----------------------------------------
     # The second CAN gets the most room of anything here: a controller, its
     # crystal, a transceiver, a choke, split termination and the two aux
     # jumpers. It sits nearest the J3 pins carrying its SPI bus.
-    ("can2",      (66.0, 13.0, 24.0, 32.0), lambda p, n, s: n & {"CAN2_TXD", "CAN2_RXD", "CAN2_INT", "CAN2_SCK", "CAN2_MOSI", "CAN2_MISO", "CAN2_CS", "XTAL1", "XTAL2", "CAN2H_T", "CAN2L_T", "CAN2_H_C", "CAN2_L_C", "CAN2_S", "TERM2_A", "CAN2_SPLIT", "AUX_A", "AUX_B"}),
-    ("kline",     (66.0, 46.0, 24.0, 16.0), lambda p, n, s: n & {"K_LINE", "K_TX", "K_RX", "K_TX_G", "K_TX_D", "K_PU"}),
-    ("ws2812",    (66.0, 63.0, 24.0,  8.0), lambda p, n, s: n & {"LED_DIN_MCU", "LED_DIN_A", "LED_DIN", "LED_5V"}),
-    ("holdup",    (66.0, 72.0, 24.0,  4.0), lambda p, n, s: n & {"SCAP_TOP", "SCAP_MID"}),
+    ("can2",      (66.0, 12.0, 24.0, 30.0), lambda p, n, s: n & {"CAN2_TXD", "CAN2_RXD", "CAN2_INT", "CAN2_SCK", "CAN2_MOSI", "CAN2_MISO", "CAN2_CS", "XTAL1", "XTAL2", "CAN2H_T", "CAN2L_T", "CAN2_H_C", "CAN2_L_C", "CAN2_S", "TERM2_A", "CAN2_SPLIT", "AUX_A", "AUX_B"}),
+    ("kline",     (66.0, 43.0, 24.0, 15.0), lambda p, n, s: n & {"K_LINE", "K_TX", "K_RX", "K_TX_G", "K_TX_D", "K_PU"}),
+    ("ws2812",    (66.0, 59.0, 24.0,  8.0), lambda p, n, s: n & {"LED_DIN_MCU", "LED_DIN_A", "LED_DIN", "LED_5V"}),
+    ("holdup",    (66.0, 68.0, 24.0, 10.0), lambda p, n, s: n & {"SCAP_TOP", "SCAP_MID"}),
 
     # ---- middle strip: under the dev board, short parts only -------------
     ("pfd",       (42.5, 14.0, 17.9, 12.0), lambda p, n, s: n & {"PFD_SENSE", "PWR_FAIL"}),
@@ -279,8 +290,30 @@ ZONES = [
 
 
 
-def zone_for(part, sheet_name):
+# Nets that carry no information -- a part touching only these has no
+# signal to place it near, so its position has to come from somewhere else.
+RAILS_ONLY = {"GND", "+5V", "+3V3", "+5VS", "SD_VDD", "OBD_VBAT"}
+
+
+def zone_for(part, sheet_name, previous=None):
+    """Which shelf a part belongs on.
+
+    A decoupling capacitor touches nothing but a rail and ground, so no
+    net-based predicate can tell where it goes, and every one of them fell
+    through to the catch-all shelf in the middle of the board. audit_routes
+    measured the result: three 100 nF bypasses between 28 and 42 mm from the
+    pin each was supposed to be bypassing, which is not a bypass -- the loop
+    it closes is longer than the one it exists to shorten.
+
+    So a rail-only capacitor inherits the zone of the part declared before
+    it. In the schematic every bypass is written directly under the IC it
+    serves, and the shelf packer fills in declaration order, which puts the
+    two side by side. Pinning each one by hand was the other option and it is
+    worse: the coordinates are relative to an IC the packer is free to move.
+    """
     nets = set(part["pins"].values())
+    if previous and part["prefix"] == "C" and nets <= RAILS_ONLY:
+        return previous
     for name, rect, pred in ZONES:
         if pred(part, nets, sheet_name):
             return name
@@ -333,15 +366,28 @@ def load_footprint(fpid):
 
 
 def courtyard_box(fp):
-    """Courtyard bbox if present, else the footprint bbox."""
-    try:
-        poly = fp.GetCourtyard(pcbnew.F_CrtYd)
-        if poly.OutlineCount():
-            return poly.BBox()
-    except Exception:
-        pass
-    return fp.GetBoundingBox()
+    """Board-coordinate bounding box of a footprint's courtyard.
 
+    Built from the courtyard graphics directly rather than from
+    GetCourtyard(). That call returns a cached polygon which pcbnew does not
+    reliably re-transform after a script rotates a footprint, so for the one
+    rotated connector on this board it kept describing an unrotated outline
+    a few millimetres from where the part actually is -- which showed up as
+    a zone-overlap warning against a shelf eleven millimetres away, and, more
+    quietly, as a fixed-part clash check that could miss a real collision.
+    Each graphic item's own GetBoundingBox() is already in board coordinates
+    and already rotated, so summing them needs no transform of our own.
+    """
+    xs, ys = [], []
+    for g in fp.GraphicalItems():
+        if g.GetLayer() in (pcbnew.F_CrtYd, pcbnew.B_CrtYd):
+            bb = g.GetBoundingBox()
+            xs += [bb.GetLeft(), bb.GetRight()]
+            ys += [bb.GetTop(), bb.GetBottom()]
+    if not xs:
+        return fp.GetBoundingBox(False, False)
+    return pcbnew.BOX2I(pcbnew.VECTOR2I(min(xs), min(ys)),
+                        pcbnew.VECTOR2I(max(xs) - min(xs), max(ys) - min(ys)))
 
 def main():
     sch.assign_refs()
@@ -453,7 +499,10 @@ def main():
                frozenset(netset) if netset is not None else None)
         buck_index.setdefault(key, []).append(pos)
 
+    last_zone, last_fp = None, None
+    decoup_anchor = {}
     for sh in sch.SHEETS:
+        last_zone, last_fp = None, None
         for p in sh["parts"]:
             if p["prefix"].startswith("#"):
                 continue
@@ -505,7 +554,16 @@ def main():
                 fp.SetPosition(pt(x, y))
                 fixed_parts.append(fp)
                 continue
-            buckets[zone_for(p, sh["name"])].append(fp)
+            zone = zone_for(p, sh["name"], last_zone)
+            if (p["prefix"] == "C" and set(p["pins"].values()) <= RAILS_ONLY
+                    and last_fp is not None):
+                # Remember what this bypass was declared under, so the shelf
+                # packer can keep the two together. Being in the right zone is
+                # not enough on its own -- see the sort below.
+                decoup_anchor[fp.GetReference()] = last_fp.GetReference()
+            else:
+                last_zone, last_fp = zone, fp
+            buckets[zone].append(fp)
 
     for fp, (x, y) in zip(hole_parts, HOLES):
         fp.SetPosition(pt(x, y))
@@ -513,6 +571,35 @@ def main():
     unused = sum(len(v) for v in buck_index.values())
     if unused:
         print("WARNING: %d BUCK_FIXED entries matched no part" % unused)
+
+    # The shelf packer does not know fixed parts exist. It fills each ZONES
+    # rectangle as though the board underneath were empty, so a rectangle
+    # drawn over a connector, a mounting hole or a pinned capacitor quietly
+    # stacks parts on top of it -- and that only ever surfaced as a DRC
+    # courtyard error after a twenty-minute route. Report it here instead.
+    #
+    # A note on trusting this, because I got it wrong once: when it first
+    # flagged a rotated connector sitting in a shelf, I "verified" the
+    # geometry by parsing the .kicad_pcb myself, saw no overlap, and deleted
+    # the check as a false positive. My parser was what was broken -- KiCad
+    # stores a footprint's graphics in FOOTPRINT-LOCAL coordinates, and I was
+    # adding the placement offset without applying the rotation, so every
+    # rotated part came out with its width and height swapped. DRC agreed
+    # with the check. If this and a hand-rolled reading of the file ever
+    # disagree again, the hand-rolled reading is the suspect.
+    fixed_boxes = []
+    for fp in list(fixed_parts) + list(hole_parts):
+        bb = courtyard_box(fp)
+        fixed_boxes.append((fp.GetReference(),
+                            pcbnew.ToMM(bb.GetLeft()), pcbnew.ToMM(bb.GetTop()),
+                            pcbnew.ToMM(bb.GetRight()), pcbnew.ToMM(bb.GetBottom())))
+    for name, (zx, zy, zw, zh), _pred in ZONES:
+        for ref, bx1, by1, bx2, by2 in fixed_boxes:
+            ox = min(zx + zw, bx2) - max(zx, bx1)
+            oy = min(zy + zh, by2) - max(zy, by1)
+            if ox > 0.01 and oy > 0.01:
+                print("     ZONE OVERLAPS FIXED  zone %-10s x %-4s %.2f x %.2f mm"
+                      % (name, ref, ox, oy))
 
     # Report courtyard overlaps between fixed parts so the tables above can
     # be tuned against real numbers instead of guesses.
@@ -559,14 +646,50 @@ def main():
             bb = courtyard_box(fp)
             sized.append((pcbnew.ToMM(bb.GetHeight()), pcbnew.ToMM(bb.GetWidth()), fp))
         sized.sort(key=lambda t: (-t[0], -t[1]))
+        # Tallest-first packs shelves tightly, and it also tears every bypass
+        # capacitor away from the IC it was declared under -- an 0805 and a
+        # SOIC-8 sort nowhere near each other. gen/audit_routes.py measured
+        # the result at 12 to 42 mm, which is not a bypass: the loop it closes
+        # is longer than the one it exists to shorten, and for a CAN
+        # transceiver that loop carries a 1 Mbit/s driver.
+        #
+        # So pull each one back to just behind its anchor after sorting. It
+        # costs a little shelf efficiency and buys a decoupling capacitor that
+        # is actually decoupling something.
+        anchored = [t for t in sized if t[2].GetReference() in decoup_anchor]
+        if anchored:
+            rest = [t for t in sized if t[2].GetReference() not in decoup_anchor]
+            out = []
+            for t in rest:
+                out.append(t)
+                for a in anchored:
+                    if decoup_anchor[a[2].GetReference()] == t[2].GetReference():
+                        out.append(a)
+            # Any whose anchor landed in a different zone keep their sorted
+            # position rather than being dropped.
+            out += [a for a in anchored if a not in out]
+            sized = out
         # Break into shelves first, place second.  A zone that does not need
         # its full height shares what is left between its rows: the analogue
         # channels were packing 20.7 mm of parts into a 28 mm shelf and then
         # sitting them 0.4 mm apart, which leaves the silkscreen nowhere to
         # go and is why the reference designators ran into each other.
         rows, row, x, row_h = [], [], zx, 0.0
-        for h, w, fp in sized:
-            if x + w > zx + zw and x > zx:
+        # Width a part needs INCLUDING the bypass that has to stay beside it.
+        # Reordering the list is not enough on its own: if the IC lands at the
+        # end of a row its capacitor wraps to the start of the next one, which
+        # on a 24 mm shelf puts them 17 mm apart -- further than before the
+        # reordering. Break the row before the pair, not between them.
+        need = []
+        for i, (h, w, fp) in enumerate(sized):
+            extra = 0.0
+            if (i + 1 < len(sized)
+                    and decoup_anchor.get(sized[i + 1][2].GetReference())
+                    == fp.GetReference()):
+                extra = sized[i + 1][1] + gap
+            need.append(w + extra)
+        for i, (h, w, fp) in enumerate(sized):
+            if x + need[i] > zx + zw and x > zx:
                 rows.append((row, row_h))
                 row, x, row_h = [], zx, 0.0
             row.append((h, w, fp))

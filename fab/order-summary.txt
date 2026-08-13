@@ -7,103 +7,86 @@ Parts order for 5 boards
    minimum order quantity and order multiple.
 
    part          order  needed  comment            designators
-   C49678          100      75  100nF 16V          C15,C24,C28,C29,C31,C32,C34,C35,C36,C38,C39,C4
-   C17414          100      75  10k                R23,R24,R28,R33,R36,R37,R38,R48,R49,R5,R50,R51
-   C149504         100      65  100k               R1,R10,R12,R15,R16,R18,R21,R27,R39,R41,R7,R77,
-   C17634          100      35  33                 R34,R42,R43,R44,R45,R46,R47
-   C408389          50      25  BAT54S             D11,D13,D15,D16,D9
-   C28260          100      20  2.2nF 50V          C10,C11,C19,C20
-   C12891          100      20  22uF 16V           C13,C14,C22,C23
-   C13585          100      20  10uF 16V           C25,C27,C30,C33
-   C223989          21      20  SMAJ40CA           D10,D12,D14,D8
-   C864177         100      20  1k 0.1%            R57,R62,R67,R72
-   C2930178        100      20  2.49k              R58,R63,R68,R73
-   C856630         100      20  10k 0.1%           R59,R64,R69,R74
-   C728642         100      20  15k 0.1%           R60,R65,R70,R75
-   C865368         100      20  2.21k 0.1%         R61,R66,R71,R76
-   C28233          100      15  100nF 100V         C16,C2,C5
-   C28323          100      10  1uF 16V            C1,C26
-   C1732           100      10  270pF 50V          C12,C21
-   C6872041        100      10  10uF 100V          C17,C4
-   C128805         100      10  10nF 100V          C18,C9
-   C134976          11      10  SMAJ26CA-13-F      D6,D7
-   C17313          100      10  MF-MSMF050         PF2,PF3
-   C15127           50      10  AO3401A            Q2,Q4
-   C8545            50      10  2N7002             Q3,Q7
-   C49254250       100      10  31.6k              R11,R13
-   C17513          100      10  1k                 R22,R40
-   C27834          100      10  5.1k               R25,R26
-   C5713386        100      10  100k 1%            R29,R3
-   C17673          100      10  4.7k               R31,R32
-   C72998          100      10  60.4               R55,R56
-   C2886898         11      10  TL3342F160QG       SW1,SW2
-   C13612           50      10  SRV05-4.TCT        U10,U11
-   C127592          50      10  TLV431ASN1T1G      U2,U6
-   C477928          11      10  LM5164DDAR         U3,U4
-   C7519            50      10  USBLC6-2SC6        U7,U8
-   C1744           100       5  4.7nF 50V          C37
+   C49678          100      60  100nF 16V          C11,C12,C14,C15,C16,C18,C22,C23,C30,C31,C32,C5
+   C17414          100      50  10k                R19,R20,R21,R22,R23,R25,R28,R32,R34,R6
+   C149504         100      40  100k               R1,R13,R15,R2,R29,R56,R57,R58
+   C408389          50      35  BAT54S             D11,D13,D15,D17,D19,D20,D7
+   C13967          100      25  470nF 50V          C25,C26,C27,C28,C29
+   C134976          26      25  SMAJ26CA-13-F      D1,D5,D6,D8,D9
+   C223989          26      25  SMAJ40CA           D10,D12,D14,D16,D18
+   C864177         100      25  1k 0.1%            R37,R41,R45,R49,R53
+   C856630         100      25  10k 0.1%           R39,R43,R47,R51,R54
+   C865368         100      25  2.21k 0.1%         R40,R44,R48,R52,R55
+   C17634          100      20  33                 R11,R16,R17,R18
+   C72998          100      20  60.4               R26,R27,R35,R36
+   C2930178        100      20  2.49k              R38,R42,R46,R50
+   C13585          100      15  10uF 16V           C10,C13,C9
+   C1744           100      10  4.7nF 50V          C17,C24
+   C12891          100      10  22uF 16V           C2,C4
+   C1794           100      10  15pF 50V           C20,C21
+   C76584           11      10  ACT45B-510-2P-TL00 L1,L2
+   C719178          11      10  MF-MSMF020/60-2    PF1,PF2
+   C8545            50      10  2N7002             Q2,Q3
+   C17513          100      10  1k                 R14,R8
+   C17673          100      10  4.7k               R10,R9
+   C13612           50      10  SRV05-4.TCT        U3,U4
+   C58988           11      10  TJA1051T/3,118     U5,U7
+   C37593           11      10  ADS1115IDGSR       U8,U9
+   C28233          100       5  100nF 100V         C1
+   C28323          100       5  1uF 16V            C19
    C46653          100       5  1nF 50V            C8
-   C80273            6       5  SMCJ40CA           D1
-   C116949          50       5  MM3Z3V6T1G         D2
+   C2480             6       5  SS14               D2
    C223993           6       5  SMAJ6.0A           D3
    C2297           100       5  green              D4
-   C193342          50       5  PMEG4010           D5
-   C187595         100       5  0466002.NR         F1
-   C1533835        100       5  742792625          FB1
-   C2661452        100       5  742792022          FB2
-   C165948           6       5  TYPE-C-31-M-12     J2
-   C719027           6       5  DM3D-SF            J9
-   C340244           6       5  ASWPA8050S330MT    L1
-   C340243           6       5  ASWPA8050S220MT    L2
-   C76584            6       5  ACT45B-510-2P-TL00 L3
-   C719178         100       5  MF-MSMF020         PF1
-   C88066            6       5  IPD068N10N3G       Q1
-   C84105           50       5  MMBT3906           Q5
-   C7472914         50       5  DMG2301L           Q6
-   C17438          100       5  121k               R14
-   C2933365        100       5  20.5k              R17
-   C163405         100       5  57.6k              R19
-   C2960780        100       5  44.2k              R2
-   C2930435        100       5  95.3k              R20
-   C2930188        100       5  27.4k 1%           R30
-   C17408          100       5  100                R35
-   C2933300        100       5  12.7k 1%           R4
-   C17713          100       5  47k                R53
-   C17514          100       5  1M                 R6
-   C17828          100       5  8.2k               R78
-   C2941042         50       5  LM74700QDBVRQ1     U1
-   C58988            6       5  TJA1051T/3,118     U12
-   C37593            6       5  ADS1115IDGSR       U13
-   C2913202          6       5  ESP32-S3-WROOM-1-N U5
-   C7484            50       5  SN74AHCT1G125DBVR  U9
+   C2661452        100       5  742792022          FB1
+   C719027           6       5  DM3D-SF            J8
+   C17313            6       5  MF-MSMF050-2       PF3
+   C7472914         50       5  DMG2301L           Q1
+   C17408          100       5  100                R12
+   C17713          100       5  47k                R24
+   C17901          100       5  100                R3
+   C17955          100       5  20                 R30
+   C17560          100       5  22k                R31
+   C17985          100       5  750                R33
+   C17695          100       5  43k 1%             R4
+   C17506          100       5  18k 1%             R5
+   C17828          100       5  8.2k               R59
+   C17514          100       5  1M                 R7
+   C127592          50       5  TLV431ASN1T1G      U1
+   C7484            50       5  SN74AHCT1G125DBVR  U2
+   C626759           6       5  MCP2518FDT-H/SL    U6
+   C5186937          6       5  TX322540M4FBCE2T   Y1
 
-   69 distinct parts, 4920 pieces after MOQ rounding
+   49 distinct parts, 3532 pieces after MOQ rounding
    LCSC enforces the true per-part minimum at checkout, so
    anything undercalled here is bumped there, not rejected.
 
 2. Not available from LCSC/JLC -- source separately
 
-   C3           x5   100uF 100V SMD electrolytic, 10 mm can
-                Nichicon UCD2A101MNL1GS or equivalent. Land is CP_Elec_10x10.5
-
-   C6, C7       x10  330uF 100V SMD electrolytic, 16 mm can
-                Land is CP_Elec_16x22 (same pads as 16x17.5). If 330 uF only exists at 18 mm, fit 220 uF at 16 mm instead -- the bank drops to 540 uF and the ride-through to ~108 ms, which is what the board was simulated at originally
+   C6, C7       x10  1 F 2.7 V low-ESR EDLC, 8 mm can, radial P3.5mm
+                Eaton HB1030-2R5105-R or equivalent. TWO THINGS TO CHECK. (1) ESR must be under about 1 ohm: a 5.5 V coin-type EDLC is 30-200 ohm and cannot source the 120 mA this has to carry, so the rail would collapse the instant it was asked to. Cylindrical cells are tens of milliohms. (2) Anything from 0.1 F up works -- 0.1 F still gives about 500 ms of hold-up against the 2.5 s the design point buys
 
    J1           x5   JST PH 4-pin vertical header, 2.00 mm
-                B4B-PH-K-S
+                B4B-PH-K-S(LF)(SN), LCSC C131334. The CAN1 + power harness: OBD-II pins 16, 4, 6, 14
 
-   J10          x5   JST PH 8-pin vertical header, 2.00 mm
-                B8B-PH-K-S
+   J2           x5   JST PH 4-pin vertical header, 2.00 mm
+                B4B-PH-K-S(LF)(SN), same part as J1. The aux bus: K-line or CAN 2, whichever AUXSEL is set to
 
-   J3, J4, J8   x15  0.1" pin header, 1x04 vertical
-                any
+   J9           x5   JST PH 10-pin vertical header, 2.00 mm
+                B10B-PH-K-S(LF)(SN), LCSC C158038. Sensor harness
 
-   J5, J7       x10  0.1" pin header, 1x06 vertical
+   J3, J4       x10  0.1" pin SOCKET, 1x22 vertical
+                RECEPTACLES, not pin headers: a DevKitC-1 ships with male pins already soldered pointing down, and it drops into these. Buy 1x22 strips -- most 1x40 socket strips do not cut cleanly and you lose a position
+
+   J5, J7, J10  x15  0.1" pin header, 1x04 vertical
                 any
 
    J6           x5   0.1" pin header, 1x03 vertical
                 any
 
-   harness      x5   JST PH crimp housings + crimps for J1 (4) and J10 (8)
-                buy with the headers or the harness cannot be made up
+   harness      x5   JST PH crimp housings + crimps
+                PHR-4 x2 and PHR-10 x1 per board, plus SPH-002T-P0.5S crimps. Buy with the headers or the loom cannot be made up
+
+   dev board    x5   ESP32-S3-DevKitC-1, N8R8 or N16R8
+                The MCU. Check the revision: v1.1 puts the onboard RGB LED on IO38, which this board leaves free for it. Some revisions use IO48, which is the WS2812 output here and would clash
 

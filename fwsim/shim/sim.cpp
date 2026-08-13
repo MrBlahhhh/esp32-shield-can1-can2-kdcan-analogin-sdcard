@@ -212,6 +212,7 @@ struct State {
   // I2C / ADS1115
   bool i2c_begun, i2c_pins_ok, ads_present;
   uint16_t ads_config;
+  double gnd_offset_v;   // sensor ground minus board ground
 
   // BLE
   bool ble_init_ok, ble_up, ble_adv, ble_conn, ble_sub;
@@ -281,6 +282,7 @@ State& S() {
     s.led_first.r = s.led_first.g = s.led_first.b = 0;
     s.led_frames = 0; s.led_brightness = 255;
     s.i2c_begun = false; s.i2c_pins_ok = true; s.ads_present = false; s.ads_config = 0;
+    s.gnd_offset_v = 0.0;
     s.ble_init_ok = true; s.ble_up = s.ble_adv = s.ble_conn = s.ble_sub = false;
     s.notifies = 0; s.last_notify = 0.0f;
     memset(&s.hooks, 0, sizeof s.hooks);
@@ -796,6 +798,15 @@ void i2c_begin(int sda, int scl) {
   }
 }
 
+// The divider ratio of the first analog channel, used to refer a ground
+// offset at the connector to the voltage the ADC actually sees.
+static double board_channel_ratio() {
+  const Board& b = board();
+  for (size_t i = 0; i < b.pins.size(); i++)
+    if (b.pins[i].role == ROLE_ANALOG_IN) return b.pins[i].ratio;
+  return 1.0;
+}
+
 void ads_set_present(bool present) { S().ads_present = present; }
 
 bool i2c_write_reg(uint8_t addr, uint8_t reg, uint16_t value) {
@@ -822,6 +833,26 @@ bool i2c_read_reg(uint8_t addr, uint8_t reg, uint16_t* out) {
     for (size_t i = 0; i < b.pins.size(); i++)
       if (b.pins[i].role == ROLE_ANALOG_IN) { gpio = b.pins[i].gpio; break; }
     double v = gpio >= 0 ? adc_pin_volts(gpio) : 0.0;
+
+    // Chassis ground offset, and whether this read cancels it.
+    //
+    // The board is grounded twice -- through the sensor loom and through USB
+    // by way of a charger elsewhere in the car -- so the sensor's ground sits
+    // some millivolts away from this board's. The loom's own ground comes
+    // back as a Kelvin wire through an attenuator matched to the signal
+    // channels, and AIN3 on both ADS1115s carries it.
+    //
+    // MUX bits 14:12 of the config register say which it is. 1xx is
+    // single-ended (AINx against the chip's own GND) and measures the offset
+    // as though it were signal; 0xx is differential against AIN3 and
+    // subtracts it exactly. Without this the model could not tell the two
+    // apart, and the suite had no way to notice a firmware that asked for
+    // the wrong one -- which the ads-single-ended mutation proved.
+    int mux = (s.ads_config >> 12) & 0x7;
+    bool single_ended = (mux & 0x4) != 0;
+    if (single_ended)
+      v += s.gnd_offset_v * board_channel_ratio();
+
     double lsb = 4.096 / 32768.0;
     long raw = (long)(v / lsb + 0.5);
     if (raw > 32767) raw = 32767;
@@ -1144,6 +1175,9 @@ void apply_event(const std::vector<std::string>& a) {
   // the board running -- a genuinely different event, and now a separate one.
   else if (c == "usb") power_set_v5(num(a, 1, 4.70));
   else if (c == "ads") ads_set_present(num(a, 1, 1) != 0);
+  // "gndoffset 0.3" = the sensor loom's ground sits 300 mV above this
+  // board's. A differential read should not notice.
+  else if (c == "gndoffset") S().gnd_offset_v = num(a, 1, 0.0);
   else if (c == "sdstall") sd_set_stalled(num(a, 1, 1) != 0);
   else if (c == "sdflush") sd_set_flush_ms(num(a, 1, 18));
   else if (c == "budget") power_set_budget(num(a, 1, 2500), num(a, 2, 769));

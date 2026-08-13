@@ -5,8 +5,8 @@ Shopping list for building the boards yourself.
   python gen/export_order.py [--boards 5] [--spares-passive 20] [--spares-ic 1]
 
 `fab/bom.csv` is written for JLCPCB's assembly flow, where quantities are
-implicit and the eight through-hole connectors and three unavailable
-electrolytics are deliberately absent. None of that is right for buying the
+implicit and the through-hole connectors, the two supercapacitors and the
+dev board itself are deliberately absent. None of that is right for buying the
 parts loose and reflowing them at home, which needs the opposite: every part,
 an explicit count, and spares for the ones that will get lost or tombstoned.
 
@@ -45,21 +45,40 @@ FAB = os.path.join(PROJ, "fab")
 # series. Check the can diameter before ordering -- the land patterns are
 # 10 mm and 16 mm, and an 18 mm part will not fit.
 ELSEWHERE = [
-    ("C3",        1, "100uF 100V SMD electrolytic, 10 mm can",
-     "Nichicon UCD2A101MNL1GS or equivalent. Land is CP_Elec_10x10.5"),
-    ("C6, C7",    2, "330uF 100V SMD electrolytic, 16 mm can",
-     "Land is CP_Elec_16x22 (same pads as 16x17.5). If 330 uF only exists at "
-     "18 mm, fit 220 uF at 16 mm instead -- the bank drops to 540 uF and the "
-     "ride-through to ~108 ms, which is what the board was simulated at "
-     "originally"),
-    ("J1",        1, "JST PH 4-pin vertical header, 2.00 mm", "B4B-PH-K-S"),
-    ("J10",       1, "JST PH 8-pin vertical header, 2.00 mm", "B8B-PH-K-S"),
-    ("J3, J4, J8", 3, "0.1\" pin header, 1x04 vertical", "any"),
-    ("J5, J7",    2, "0.1\" pin header, 1x06 vertical", "any"),
+    # Every designator here is through-hole, so it is deliberately absent
+    # from fab/. The two supercapacitors are the only ones that are not just
+    # a connector, and they are the only line on this board where the exact
+    # part actually matters -- see the note.
+    ("C6, C7",    2, "1 F 2.7 V low-ESR EDLC, 8 mm can, radial P3.5mm",
+     "Eaton HB1030-2R5105-R or equivalent. TWO THINGS TO CHECK. (1) ESR must "
+     "be under about 1 ohm: a 5.5 V coin-type EDLC is 30-200 ohm and cannot "
+     "source the 120 mA this has to carry, so the rail would collapse the "
+     "instant it was asked to. Cylindrical cells are tens of milliohms. "
+     "(2) Anything from 0.1 F up works -- 0.1 F still gives about 500 ms of "
+     "hold-up against the 2.5 s the design point buys"),
+    ("J1",        1, "JST PH 4-pin vertical header, 2.00 mm",
+     "B4B-PH-K-S(LF)(SN), LCSC C131334. The CAN1 + power harness: OBD-II "
+     "pins 16, 4, 6, 14"),
+    ("J2",        1, "JST PH 4-pin vertical header, 2.00 mm",
+     "B4B-PH-K-S(LF)(SN), same part as J1. The aux bus: K-line or CAN 2, "
+     "whichever AUXSEL is set to"),
+    ("J9",        1, "JST PH 10-pin vertical header, 2.00 mm",
+     "B10B-PH-K-S(LF)(SN), LCSC C158038. Sensor harness"),
+    ("J3, J4",    2, "0.1\" pin SOCKET, 1x22 vertical",
+     "RECEPTACLES, not pin headers: a DevKitC-1 ships with male pins already "
+     "soldered pointing down, and it drops into these. Buy 1x22 strips -- "
+     "most 1x40 socket strips do not cut cleanly and you lose a position"),
+    ("J5, J7, J10", 3, "0.1\" pin header, 1x04 vertical", "any"),
     ("J6",        1, "0.1\" pin header, 1x03 vertical", "any"),
-    ("harness",   1, "JST PH crimp housings + crimps for J1 (4) and J10 (8)",
-     "buy with the headers or the harness cannot be made up"),
+    ("harness",   1, "JST PH crimp housings + crimps",
+     "PHR-4 x2 and PHR-10 x1 per board, plus SPH-002T-P0.5S crimps. Buy with "
+     "the headers or the loom cannot be made up"),
+    ("dev board", 1, "ESP32-S3-DevKitC-1, N8R8 or N16R8",
+     "The MCU. Check the revision: v1.1 puts the onboard RGB LED on IO38, "
+     "which this board leaves free for it. Some revisions use IO48, which is "
+     "the WS2812 output here and would clash"),
 ]
+
 
 
 # LCSC enforces a minimum order quantity and an order *multiple* per part, and

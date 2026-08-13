@@ -36,25 +36,34 @@ SKETCH = os.path.join(PROJ, "firmware", "esp32_shiftlight_wideband", "src", "mai
 # (name, what a human would call the mistake, find, replace)
 MUTATIONS = [
     ("gain-from-other-board", "DIVIDER_GAIN left at the R53 board's 2.0",
-     "static const float DIVIDER_GAIN = 1.7334f;",
+     "static const float DIVIDER_GAIN = 5.9774f;",
      "static const float DIVIDER_GAIN = 2.0f;"),
     ("led-pin", "WS2812 pin left on GPIO4",
      "#define LED_PIN     48", "#define LED_PIN     4"),
     ("can-tx-pin", "TWAI TX left on GPIO5",
      "#define CAN_TX_PIN  GPIO_NUM_17", "#define CAN_TX_PIN  GPIO_NUM_5"),
     ("i2c-pins", "ADS1115 bus left on the R53 board's GPIO7/8",
-     "static const int   ADS_SDA_PIN  = 38;", "static const int   ADS_SDA_PIN  = 7;"),
-    ("no-sensor-rail", "SENS_EN never raised, so the sensors stay unpowered",
-     "  digitalWrite(SENS_EN_PIN, HIGH);", "  digitalWrite(SENS_EN_PIN, LOW);"),
+     "static const int   ADS_SDA_PIN  = 10;",
+     "static const int   ADS_SDA_PIN  = 7;"),
+    ("ads-single-ended", "ADS1115 read single-ended, so the chassis offset "
+     "is measured as signal",
+     'if (!adsWriteReg(0x01, 0x1283)) return;',
+     'if (!adsWriteReg(0x01, 0x4283)) return;'),
+    ("sd-4bit", "card mounted in 4-bit mode, but only D0 is wired",
+     'if (!SD_MMC.begin("/sdcard", true)) {',
+     'if (!SD_MMC.begin("/sdcard", false)) {'),
+    ("vbat-divider", "battery monitor left at the inherited 11.0 divisor",
+     "static const float VBAT_DIVIDER = 13.195f;",
+     "static const float VBAT_DIVIDER = 11.0f;"),
     ("no-pwrfail-isr", "power-fail interrupt never attached",
      "  attachInterrupt(digitalPinToInterrupt(PWR_FAIL_PIN), onPowerFail, RISING);",
-     "  // attachInterrupt removed by mutation"),
-    ("isr-keeps-rail-up", "ISR no longer sheds the sensor rail (halves the window)",
-     "  powerFailed = true;\n  digitalWrite(SENS_EN_PIN, LOW);",
-     "  powerFailed = true;"),
+     "  (void)0;  // attachInterrupt removed by mutation"),
     ("no-close", "shutdown() never closes the log file",
-     "    logFile.close();\n    SD_MMC.end();",
-     "    SD_MMC.end();"),
+     "    logFile.close();\n    SD_MMC.end();\n    sdUp = false;",
+     "    SD_MMC.end();\n    sdUp = false;"),
+    ("no-led-shed", "shutdown() leaves the strip lit, so the hold-up budget "
+     "stays at its 769 ms worst case instead of 2500 ms",
+     "  FastLED.clear(true);", "  // strip left lit by mutation"),
     ("rpm-byte-swap", "RPM decoded big-endian instead of little",
      "uint16_t raw = msg.data[2] | ((uint16_t)msg.data[3] << 8);",
      "uint16_t raw = msg.data[3] | ((uint16_t)msg.data[2] << 8);"),
@@ -73,9 +82,8 @@ MUTATIONS = [
     ("led-boot-float", "GPIO48 not driven low before FastLED claims it",
      "  pinMode(LED_PIN, OUTPUT);\n  digitalWrite(LED_PIN, LOW);",
      "  // boot-low removed by mutation"),
-    ("sd-1bit", "card mounted in 1-bit mode",
-     '  if (!SD_MMC.begin("/sdcard", false)) {', '  if (!SD_MMC.begin("/sdcard", true)) {'),
 ]
+
 
 
 def run_suite(sketch_path):

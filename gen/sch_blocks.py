@@ -119,7 +119,7 @@ def channel(n):
             # Rotation 0 is VERTICAL for Device:R and Device:C -- 90 lays
             # them down. Both of these are legs to ground, so they stand up.
             ("2.21k",      {ain, "GND"},     35.56,   7.62,   0),
-            ("100nF",      {ain, "GND"},     45.72,   7.62,   0),
+            ("470nF",      {ain, "GND"},     45.72,   7.62,   0),
             ("BAT54S", {"GND", "+3V3", ain}, 40.64, -16.51,   0),
         ],
         "wires": [
@@ -460,8 +460,8 @@ RIDETHRU = {
     "anchor": ("TLV431A", {"PWR_FAIL", "PFD_SENSE", "GND"}),
     "parts": [
         # value    nets                            dx      dy   rot
-        ("28.7k", {"+5V", "PFD_SENSE"},         -16.51, -17.78,   0),
-        ("12.0k", {"PFD_SENSE", "GND"},         -16.51,  -5.08,   0),
+        ("43k",   {"+5V", "PFD_SENSE"},         -16.51, -17.78,   0),
+        ("18k",   {"PFD_SENSE", "GND"},         -16.51,  -5.08,   0),
         ("1nF",   {"PFD_SENSE", "GND"},          -7.62,  -5.08,   0),
         ("10k",   {"+3V3", "PWR_FAIL"},          10.16,  -6.35,   0),
         ("1M",    {"PWR_FAIL", "PFD_SENSE"},     -3.81,   5.08, 270),

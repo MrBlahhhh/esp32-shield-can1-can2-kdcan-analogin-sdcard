@@ -43,6 +43,7 @@ hardware.
 from __future__ import annotations
 
 import argparse
+import re
 import glob
 import os
 import shutil
@@ -369,7 +370,7 @@ def plot(runs, path):
             ax[1].axvline(pf, color="k", ls="--", lw=1.0)
             ax[1].annotate("PWR_FAIL", (pf, 104), fontsize=8, ha="left")
         closed = _first_time(ig, lambda r: r["sd_open"] == 0 and r["t_ms"] > pf)
-        if closed:
+        if closed is not None and pf == pf:
             ax[1].axvline(closed, color="tab:red", ls="--", lw=1.0)
             ax[1].annotate("file closed\n+%.0f ms" % (closed - pf),
                            (closed + 2, 60), fontsize=8)
@@ -406,12 +407,19 @@ def _wrap(text, indent, width=96):
 # read this off the module's footprint pins; with the module gone it found
 # nothing and reported every pin as a mismatch, which is the check doing its
 # job rather than a bug.
+#
+# Keyed on the socket's MPN and resolved to a designator at run time, not
+# written as "J2"/"J3". Splitting the harness into two plugs renumbered every
+# connector after it and turned the sockets into J3/J4 -- a hard-coded map
+# then silently read the wrong parts and reported the whole pin map as a
+# mismatch. Designators are assigned sequentially as parts are declared, so
+# they are an output of the generator, not a name to depend on.
 SOCKET_PIN_TO_GPIO = {
-    # J2 on this board mirrors the dev board's J1
-    "J2": {4: 4, 5: 5, 6: 6, 7: 7, 8: 15, 9: 16, 10: 17, 11: 18, 12: 8,
+    # mirrors the dev board's J1 header
+    "ESP32-S3-DevKitC-1 J1": {4: 4, 5: 5, 6: 6, 7: 7, 8: 15, 9: 16, 10: 17, 11: 18, 12: 8,
            13: 3, 14: 46, 15: 9, 16: 10, 17: 11, 18: 12, 19: 13, 20: 14},
-    # J3 mirrors the dev board's J3
-    "J3": {2: 43, 3: 44, 4: 1, 5: 2, 6: 42, 7: 41, 8: 40, 9: 39, 10: 38,
+    # mirrors the dev board's J3 header
+    "ESP32-S3-DevKitC-1 J3": {2: 43, 3: 44, 4: 1, 5: 2, 6: 42, 7: 41, 8: 40, 9: 39, 10: 38,
            11: 37, 12: 36, 13: 35, 14: 0, 15: 45, 16: 48, 17: 47, 18: 21,
            19: 20, 20: 19},
 }
@@ -437,6 +445,22 @@ def study_pinmap(exes):
         else:
             model[int(gpio)] = net
 
+    # Resolve each socket's MPN to whatever designator it ended up with.
+    sys.path.insert(0, HERE)
+    import generate_schematic as _sch
+    _sch.assign_refs()
+    socket_refs = {}
+    for _sh in _sch.SHEETS:
+        for _p in _sh["parts"]:
+            table = SOCKET_PIN_TO_GPIO.get(_p["mpn"])
+            if table:
+                socket_refs[_p["ref"]] = table
+    if len(socket_refs) != len(SOCKET_PIN_TO_GPIO):
+        raise SystemExit("study 0: expected %d sockets, resolved %d (%s) -- "
+                         "SOCKET_PIN_TO_GPIO is keyed on MPNs that no longer "
+                         "exist" % (len(SOCKET_PIN_TO_GPIO), len(socket_refs),
+                                    sorted(socket_refs)))
+
     netlist = {}
     path = os.path.join(PROJ, "netlist.txt")
     for line in open(path, encoding="utf-8"):
@@ -445,8 +469,8 @@ def study_pinmap(exes):
             continue
         for ref in parts[1:]:
             m = re.fullmatch(r"(J\d+)\.(\d+)", ref)
-            if m and m.group(1) in SOCKET_PIN_TO_GPIO:
-                gpio = SOCKET_PIN_TO_GPIO[m.group(1)].get(int(m.group(2)))
+            if m and m.group(1) in socket_refs:
+                gpio = socket_refs[m.group(1)].get(int(m.group(2)))
                 if gpio is not None:
                     netlist.setdefault(gpio, []).append(parts[0])
 
@@ -732,6 +756,73 @@ def study_ported_detail(exes):
               "lit=%d rgb=(%d,%d,%d)" % (row["leds_lit"], row["led_r"],
                                          row["led_g"], row["led_b"]))
 
+    # --- the two things mutation testing said nothing was watching --------
+    #
+    # Both of these were real bugs on this board, found by hand and fixed;
+    # neither had a check, so gen/mutate_firmware.py could put them back and
+    # the suite stayed green. That is the definition of a gap.
+
+    # 1. The battery divider. It read 11.0 against a 13.2:1 network for the
+    #    whole life of the parent board -- every reading 20% low -- and the
+    #    fwsim model carried the same wrong constant, so the two agreed with
+    #    each other and neither agreed with the schematic. Study 0 compares
+    #    nets, not ratios, and could not see it.
+    scn = """board autosport
+duration 2500
+trace 5
+@0 usb 4.70
+@0 vbat 13.80
+@0 sensorrail 1 5vs
+@0 canid 0x316
+@0 canrate 50
+@0 rpm 3000
+"""
+    rb = Run("ported_vbat", exes["autosport"], scn)
+    reported = [float(m) for m in
+                re.findall(r"batt\s+([\d.]+)", rb.serial)]
+    got = reported[-1] if reported else float("nan")
+    err = abs(got - 13.80) / 13.80 * 100.0 if got == got else 999.0
+    check(err < 3.0, "ported firmware reports battery voltage correctly",
+          "13.80 V applied, %.2f V reported (%.1f%% out)" % (got, err))
+
+    # 2. The differential read. AIN3 on both ADS1115s carries the sensor
+    #    loom's own ground through a matched attenuator, and the config
+    #    register decides whether that gets subtracted. Ask for a
+    #    single-ended conversion instead and a chassis offset is measured as
+    #    signal -- which is worse than useless, because the 0.1% dividers
+    #    exist to make exactly that error small.
+    # "ble hwmode 1" is what switches the sketch to the ADS1115 -- the same
+    # lazy probe study 14 exercises. Without it the reading comes off the
+    # ESP32's own SAR ADC, which never touches the config register, and this
+    # check silently measures nothing.
+    def wideband_at(offset_v, tag):
+        scn = """board autosport
+duration 2600
+trace 5
+@0 usb 4.70
+@0 vbat 13.80
+@0 sensorrail 1 5vs
+@0 gndoffset %.3f
+@0 ads 1
+@0 sensor 1 2.000
+@500 ble connect
+@600 ble subscribe 1
+@800 ble hwmode 1
+""" % offset_v
+        rr = Run("ported_gnd_%s" % tag, exes["autosport"], scn)
+        return rr.rows[-1]["notify_v"]
+
+    clean = wideband_at(0.0, "clean")
+    shifted = wideband_at(0.300, "offset")
+    slip = abs(shifted - clean)
+    # 300 mV at the connector is 50 mV at the ADC through the 0.1673 divider,
+    # which referred back to the input is the full 300 mV. Anything over about
+    # 30 mV of movement means the offset is not being subtracted.
+    check(slip < 0.030,
+          "a 300 mV chassis offset does not move the reading",
+          "%.3f V with no offset, %.3f V with 300 mV -- moved %.0f mV"
+          % (clean, shifted, slip * 1000))
+
     # The simulator raises warnings for things that are legal but wrong on this
     # board -- a floating WS2812 buffer input at boot, a card unmounted by
     # pulling its supply, a 1-bit mount. Nothing asserted on them, so all three
@@ -855,14 +946,20 @@ trace 1
         rows.append((label, shed, closed, pf, collapse, lost))
         print("    %-26s %9s %9.0fms %9s"
               % (label + " (%.0f ms)" % shed,
-                 "LOST" if lost else "+%.0f ms" % (closed - pf),
+                 "LOST" if lost else
+                 ("NEVER CLOSED" if closed is None else "+%.0f ms" % (closed - pf)),
                  collapse - pf,
                  "FILE LOST" if lost else "ok"))
     worst = rows[-1]
-    check(not worst[5],
+    # worst[2] is `closed`. A None there means the file was still open when
+    # the run ended and nothing else noticed -- which is exactly what the
+    # no-close mutation does, and it used to crash this report rather than
+    # fail it.
+    check(not worst[5] and worst[2] is not None,
           "the log survives a power cut on an aged bank with nothing shed",
           "file closed %s a %.0f ms window"
-          % ("+%.0f ms into" % (worst[2] - worst[3]) if worst[2] else "never within", worst[1]))
+          % ("+%.0f ms into" % (worst[2] - worst[3]) if worst[2]
+             else "NEVER within", worst[1]))
     # How slow a card still fits inside the *worst-case* window, not the nominal.
     print("\n  Card latency the 538 ms corner tolerates:")
     last_ok = None
@@ -1072,6 +1169,23 @@ def main():
 
     head("Result")
     print("  %d checks passed, %d failed" % (len(PASSES), len(FAILS)))
+    # Record the totals so gen/audit_docs.py can hold the README's numbers
+    # against a real run. Counting check() calls in this file instead gives
+    # the wrong answer -- several of them sit inside loops.
+    #
+    # Only on a FULL run. The mutation harness invokes this with --sketch
+    # autosport, which runs 25 of the 48 checks, and that partial figure was
+    # overwriting the file and making audit_docs report the README as wrong.
+    full_run = args.only is None and args.sketch == "both" and not args.sketch_path
+    if not full_run:
+        return 1 if FAILS else 0
+    try:
+        os.makedirs(os.path.join(PROJ, "sim", "fw"), exist_ok=True)
+        with open(os.path.join(PROJ, "sim", "fw", "result.txt"), "w",
+                  encoding="utf-8") as fh:
+            fh.write("passed %d\nfailed %d\n" % (len(PASSES), len(FAILS)))
+    except OSError:
+        pass
     for f in FAILS:
         print("    FAIL  %s" % f)
     print("\n  artefacts in sim/fw/ -- one .txt scenario, .csv trace, .log serial")

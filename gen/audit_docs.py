@@ -42,33 +42,37 @@ DOCS = ["README.md", os.path.join("docs", "BRINGUP.md"), os.path.join("fwsim", "
 # "the docs say this designator is this part" -- substring match against the
 # BOM Value. Verified by hand against netlist.txt pin-for-pin on 2026-08-12.
 CLAIMS = {
-    "U1": "LM74700",          # ideal-diode controller
-    "U2": "TLV431",           # power-fail detector (NOT a buck)
-    "U3": "LM5164",           # +5 V buck
-    "U4": "LM5164",           # +3V3 buck
-    "U5": "ESP32-S3-WROOM-1", # the module
-    "U6": "TLV431",           # USB over-voltage cutoff
-    "U7": "USBLC6",           # ESD on the USB data pair
-    "U8": "USBLC6",           # ESD on the USB-C CC pins
-    "U9": "74AHCT1G125",      # WS2812 5 V buffer
-    "U10": "SRV05",           # card-slot ESD
-    "U11": "SRV05",           # card-slot ESD
-    "U12": "TJA1051",         # CAN transceiver
-    "U13": "ADS1115",         # 16-bit ADC
-    "Q1": "IPD068N10",        # reverse-battery FET
-    "D1": "SMCJ40CA",         # harness transient clamp
+    "U1": "TLV431",           # power-fail detector
+    "U2": "74AHCT1G125",      # WS2812 5 V buffer
+    "U3": "SRV05",            # card-slot ESD
+    "U4": "SRV05",            # card-slot ESD
+    "U5": "TJA1051",          # CAN 1 transceiver
+    "U6": "MCP2518FD",        # CAN 2 controller, on SPI
+    "U7": "TJA1051",          # CAN 2 transceiver
+    "U8": "ADS1115",          # 16-bit ADC, 0x48, channels 1-3
+    "U9": "ADS1115",          # 16-bit ADC, 0x49, channel 4 + two spare
+    "Q1": "DMG2301L",         # microSD supply switch
+    "Q2": "2N7002",           # its level shifter
+    "Q3": "2N7002",           # K-line low-side driver
+    "Y1": "40MHz",            # MCP2518FD clock
+    "L1": "51uH",             # CAN 1 choke
+    "L2": "51uH",             # CAN 2 choke
+    "D2": "SS14",             # hold-up discharge path
     "D3": "SMAJ6.0A",         # sensor rail clamp
-    "D6": "SMAJ26CA",         # CAN_H clamp
-    "D7": "SMAJ26CA",         # CAN_L clamp
-    "C3": "100uF",            # bulk hold-up
-    "C6": "330uF",            # ride-through
-    "C7": "330uF",            # ride-through
-    "R55": "60.4",            # split termination
-    "R56": "60.4",            # split termination
-    "R64": "10k",             # battery monitor, low leg
-    "R77": "100k",            # battery monitor, high leg
-    "F1": "2A",               # input fuse
+    "D4": "green",            # the board's only LED
+    "J1": "CAN1 + power",     # OBD harness, bus 1
+    "J2": "Aux bus",          # K-line or CAN 2
+    "J3": "DevKit J1",        # socket, left row
+    "J4": "DevKit J3",        # socket, right row
+    "J8": "microSD",          # card slot
+    "J9": "Sensor harness",   # analog loom
+    "C6": "1F",               # hold-up cell
+    "C7": "1F",               # hold-up cell
+    "PF1": "0.2A",            # OBD 12 V protection
+    "PF2": "0.2A",            # sensor rail
+    "PF3": "0.5A",            # shift-light tap
 }
+
 
 
 def load_bom():
@@ -129,6 +133,25 @@ def measure():
     for r in fb:
         d |= {x.strip() for x in r["Designator"].split(",") if x.strip()}
     m["fab_designators"] = len(d)
+    nets_txt = set()
+    for line in open(os.path.join(PROJ, "netlist.txt"), encoding="utf-8"):
+        parts = line.split()
+        if len(parts) >= 2:
+            nets_txt.add(parts[0])
+    m["nets_txt"] = len(nets_txt)
+
+    # The README quotes how many checks the firmware suite runs, and the
+    # number comes from the suite's own last run rather than from counting
+    # check() calls in its source. Several of those sit inside loops, so the
+    # source count is 41 against 48 actually executed -- close enough to look
+    # right and wrong enough to be useless.
+    res = os.path.join(PROJ, "sim", "fw", "result.txt")
+    m["fw_checks"] = -1
+    if os.path.exists(res):
+        for line in open(res, encoding="utf-8"):
+            if line.startswith("passed "):
+                m["fw_checks"] = int(line.split()[1])
+
     cpl = {r["Designator"].strip() for r in
            csv.DictReader(open(os.path.join(PROJ, "fab", "positions.csv"), encoding="utf-8"))}
     m["cpl_designators"] = len(cpl)
@@ -140,22 +163,19 @@ def measure():
 # Prose is not machine-readable, so the patterns are pinned by hand -- but the
 # *values* come from the artefacts, so the numbers can never quietly rot again.
 NUMBER_CLAIMS = [
-    ("routed board stats", r"— (\d+) tracks, (\d+) vias, (\d+) footprints, (\d+) nets",
-     ["tracks", "vias", "footprints", "nets"]),
-    ("board size (status)", r"is \*\*(\d+) x (\d+) mm\*\*", ["board_x", "board_y"]),
-    ("board size (§9)", r"(\d+) x (\d+) mm, 4 layers", ["board_x", "board_y"]),
-    ("board size (§11)", r"read (\d+) x (\d+) mm and 4 layers", ["board_x", "board_y"]),
+    ("board size", r"\| Board \| (\d+) [x\u00d7] (\d+) mm, 4 layer", ["board_x", "board_y"]),
     ("parts row", r"\| Parts \| (\d+) component instances, (\d+) distinct BOM lines",
      ["instances", "bom_lines"]),
-    ("fab designators (status)", r"list the same (\d+) designators", ["fab_designators"]),
-    ("fab designators (§11)", r"list the same \*\*(\d+)\s*\n?designators\*\*", ["fab_designators"]),
-    ("lines carrying a part number",
-     r"agree\. All (\d+)\s*\nlines carry a part number", ["fab_with_pn"]),
-    ("SMT parts placed", r"JLC places all (\d+) surface-mount parts", ["fab_designators"]),
-    ("match-the-parts split",
-     r"All \*\*(\d+)\*\* lines arrive with a part number and match",
+    ("nets row", r"\| Nets \| (\d+) \|", ["nets_txt"]),
+    ("assembly row",
+     r"\| Assembly \| (\d+) surface-mount designators across (\d+) fab BOM lines",
+     ["fab_designators", "fab_lines"]),
+    ("every fab line has a part number",
+     r"Every one of the (\d+) fab BOM lines carries an LCSC part number",
      ["fab_with_pn"]),
+    ("firmware check count", r"\*\*(\d+) checks\*\*, the real sketch", ["fw_checks"]),
 ]
+
 
 
 def check_numbers(failures):
@@ -170,6 +190,14 @@ def check_numbers(failures):
             continue
         got = [int(g) for g in hit.groups()]
         want = [m[k] for k in keys]
+        # -1 means the artefact that would answer this has not been produced.
+        # sim/fw/ is gitignored, so a fresh clone has no firmware-suite result
+        # to compare against, and failing an audit because a suite has not
+        # been run yet is noise rather than a finding.
+        if -1 in want:
+            print("  skip  %-30s no artefact yet -- run the suite that makes it"
+                  % label)
+            continue
         ok = got == want
         if not ok:
             failures.append("%s: README says %s, artefacts say %s" % (label, got, want))

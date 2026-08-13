@@ -399,8 +399,7 @@ SMC = "Diode_SMD:D_SMC"
 SMA = "Diode_SMD:D_SMA"
 SOD123 = "Diode_SMD:D_SOD-123"
 LED0805 = "LED_SMD:LED_0805_2012Metric"
-JST6 = "Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical"
-JST8 = "Connector_JST:JST_PH_B8B-PH-K_1x08_P2.00mm_Vertical"
+JST4 = "Connector_JST:JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical"
 JST10 = "Connector_JST:JST_PH_B10B-PH-K_1x10_P2.00mm_Vertical"
 SOIC14 = "Package_SO:SOIC-14_3.9x8.7mm_P1.27mm"
 XTAL4 = "Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm"
@@ -471,47 +470,91 @@ def split_value(value):
 # load-bearing: the OBD 12 V decoupler must be the 100 V part, not the 16 V
 # one that shares its value.
 GENERIC_LCSC = {
-    "0466002.NR": "C187595",
-    "100": "C17408",
-    "100k": "C149504",
-    "100k1%": "C5713386",
-    "100nF100V": "C28233",
-    "100nF16V": "C49678",
-    "10k": "C17414",
-    "10k0.1%": "C856630",
-    "10nF100V": "C128805",
-    "10uF100V": "C6872041",
-    "10uF16V": "C13585",
-    "12.7k1%": "C2933300",
-    "121k": "C17438",
-    "15k0.1%": "C728642",
-    "1M": "C17514",
-    "1k": "C17513",
-    "1k0.1%": "C864177",
-    "1nF50V": "C46653",
-    "1uF16V": "C28323",
-    "1uF50V": "C28323",
-    "2.21k0.1%": "C865368",
-    "2.2nF50V": "C28260",
-    "2.49k": "C2930178",
-    "20.5k": "C2933365",
-    "22uF16V": "C12891",
-    "27.4k1%": "C2930188",
-    "270pF50V": "C1732",
-    "31.6k": "C49254250",
-    "33": "C17634",
-    "4.7k": "C17673",
-    "4.7nF50V": "C1744",
-    "44.2k": "C2960780",
-    "47k": "C17713",
-    "5.1k": "C27834",
-    "57.6k": "C163405",
-    "60.4": "C72998",
-    "742792022": "C2661452",
-    "742792625": "C1533835",
-    "8.2k": "C17828",
-    "95.3k": "C2930435",
+    # Verified against JLCPCB's basic-parts list, 2026-08-12. Package is part
+    # of the key -- see generic_lcsc() for why that is not optional.
+    ("100", "1206"): "C17901",      # 1/4 W, the supercap charge resistor
+    ("15pF50V", "0805"): "C1794",
+    ("470nF50V", "0805"): "C13967",  # CL21B474KBFNNNE, X7R
+    ("18k1%", "0805"): "C17506",
+    ("20", "1206"): "C17955",       # 1/4 W, K-line series
+    ("22k", "0805"): "C17560",
+    ("43k1%", "0805"): "C17695",
+    ("750", "1206"): "C17985",      # 1/4 W, K-line tester pull-up
+    ("0466002.NR", "1206"): "C187595",
+    ("100", "0805"): "C17408",
+    ("100k", "0805"): "C149504",
+    ("100k1%", "0805"): "C5713386",
+    ("100nF100V", "0805"): "C28233",
+    ("100nF16V", "0805"): "C49678",
+    ("10k", "0805"): "C17414",
+    ("10k0.1%", "0805"): "C856630",
+    ("10nF100V", "0805"): "C128805",
+    ("10uF100V", "1206"): "C6872041",
+    ("10uF16V", "1206"): "C13585",
+    ("12.7k1%", "0805"): "C2933300",
+    ("121k", "0805"): "C17438",
+    ("15k0.1%", "0805"): "C728642",
+    ("1M", "0805"): "C17514",
+    ("1k", "0805"): "C17513",
+    ("1k0.1%", "0805"): "C864177",
+    ("1nF50V", "0805"): "C46653",
+    ("1uF16V", "0805"): "C28323",
+    ("1uF50V", "0805"): "C28323",
+    ("2.21k0.1%", "0805"): "C865368",
+    ("2.2nF50V", "0805"): "C28260",
+    ("2.49k", "0805"): "C2930178",
+    ("20.5k", "0805"): "C2933365",
+    ("22uF16V", "1206"): "C12891",
+    ("27.4k1%", "0805"): "C2930188",
+    ("270pF50V", "0805"): "C1732",
+    ("31.6k", "0805"): "C49254250",
+    ("33", "0805"): "C17634",
+    ("4.7k", "0805"): "C17673",
+    ("4.7nF50V", "0805"): "C1744",
+    ("44.2k", "0805"): "C2960780",
+    ("47k", "0805"): "C17713",
+    ("5.1k", "0805"): "C27834",
+    ("57.6k", "0805"): "C163405",
+    ("60.4", "0805"): "C72998",
+    ("742792022", "0805"): "C2661452",
+    ("742792625", "1206"): "C1533835",
+    ("8.2k", "0805"): "C17828",
+    ("95.3k", "0805"): "C2930435",
 }
+
+
+_SIZE_RE = re.compile(r"_(0402|0603|0805|1206|1210|1812|2010|2512)_")
+
+
+def package_size(footprint):
+    """'Resistor_SMD:R_1206_3216Metric' -> '1206'. Empty if not a chip part."""
+    m = _SIZE_RE.search(footprint)
+    return m.group(1) if m else ""
+
+
+def generic_lcsc(comment, mpn, footprint):
+    """Look up a jellybean part number by value AND package.
+
+    Keyed on package as well as value, which it was not. A 33 ohm resistor is
+    a 33 ohm resistor, but C17634 is specifically an 0805 one -- and this
+    board has 33 ohm on a 1206 land as well, for the K-line driver's fault
+    current. Keyed on value alone, the 1206 position ordered the 0805 part:
+    the right resistance, on a footprint it does not fit, on every board.
+    Nothing downstream could have caught it. The fab BOM would have looked
+    complete, JLC would have shipped, and it would have shown up at reflow.
+
+    Returning "" is the safe failure. An unmatched line has no part number,
+    export_order.py refuses to write it, and somebody has to go and look.
+    """
+    size = package_size(footprint)
+    if not size:
+        return ""
+    for key in (comment, mpn, mpn.split()[-1] if mpn else ""):
+        if key:
+            hit = GENERIC_LCSC.get((key, size))
+            if hit:
+                return hit
+    return ""
 
 
 def part(sh, prefix, lib_id, value, footprint, pins, mpn="", note="", nc=(),
@@ -534,9 +577,7 @@ def part(sh, prefix, lib_id, value, footprint, pins, mpn="", note="", nc=(),
             # ...or by bare MPN. export_fab.py drops the manufacturer from
             # the Comment ("Wurth 742792022" -> "742792022"), so match the
             # last token too.
-            "lcsc": lcsc or GENERIC_LCSC.get(base + volt + tol)
-                    or GENERIC_LCSC.get(mpn)
-                    or GENERIC_LCSC.get(mpn.split()[-1] if mpn else "", ""),
+            "lcsc": lcsc or generic_lcsc(base + volt + tol, mpn, footprint),
         }
     )
 
@@ -595,23 +636,35 @@ pw = sheet(
 # go to the two things that need the vehicle side: the K-line and a real
 # battery-voltage reading.
 #
-#   J   OBD-II   what
+#   J1  OBD-II   what
 #   1   16       battery + (permanent). SENSE ONLY -- see the note below
 #   2   4/5      chassis / signal ground
 #   3   6        CAN_H     bus 1, D-CAN on a BMW/MINI
 #   4   14       CAN_L
-#   5   7        AUX_A     K-line, OR the second bus's CAN_H
-#   6   -        AUX_B     unused in K-line mode, CAN_L for the second bus
-#   7   4/5      ground, so the CAN1 pair can be twisted with a return
-#   8   4/5      ground, ditto for the aux pair
-part(pw, "J", "Connector_Generic:Conn_01x08", "OBD-II harness", JST8,
-     {"1": "OBD_VBAT", "2": "GND", "3": "CAN_H", "4": "CAN_L",
-      "5": "AUX_A", "6": "AUX_B", "7": "GND", "8": "GND"},
-     "JST B8B-PH-K-S(LF)(SN)",
-     "Pins 3/4 are the first CAN bus, always. Pins 5/6 are the second port "
-     "and what they carry is a solder-jumper choice -- K-line on AUX_A, or "
-     "the second CAN pair. Pin 1 is sense only: the board is powered from "
-     "the dev board's USB-C, not from here", lcsc="C157974")
+#
+#   J10 OBD-II   what
+#   1   7        AUX_A     K-line, OR the second bus's CAN_H
+#   2   -        AUX_B     unused in K-line mode, CAN_L for the second bus
+#   3   4/5      ground
+#   4   4/5      ground, so the aux pair can be twisted with a return
+# TWO connectors, not one, and the reason is layout rather than wiring
+# taste. CAN 1 hangs off the J1 socket row on the left of the board; the
+# second bus and the K-line hang off J3 on the right. A single harness plug
+# had to sit on one side or the other, and gen/audit_routes.py measured what
+# that cost: 163 mm of CAN_H and 168 mm of CAN_L snaking the length of the
+# board to reach a transceiver at the far corner. Two plugs, each beside the
+# circuit it feeds, and both runs are short.
+part(pw, "J", "Connector_Generic:Conn_01x04", "CAN1 + power harness", JST4,
+     {"1": "OBD_VBAT", "2": "GND", "3": "CAN_H", "4": "CAN_L"},
+     "JST B4B-PH-K-S(LF)(SN)",
+     "OBD-II pins 16/4/6/14. Pin 1 is sense only -- the board is powered "
+     "from the dev board's USB-C, not from here", lcsc="C131334")
+part(pw, "J", "Connector_Generic:Conn_01x04", "Aux bus harness", JST4,
+     {"1": "AUX_A", "2": "AUX_B", "3": "GND", "4": "GND"},
+     "JST B4B-PH-K-S(LF)(SN)",
+     "The second port. What these two pins carry is a solder-jumper choice: "
+     "K-line on AUX_A (the default, which is what an R53 wants), or the "
+     "second CAN pair. See AUXSEL and AUXCL on the CAN sheet", lcsc="C131334")
 
 # OBD pin 16 is permanent battery, so it is live whenever the harness is
 # plugged in, ignition or not. Nothing on this board is powered from it: it
@@ -620,10 +673,16 @@ part(pw, "J", "Connector_Generic:Conn_01x08", "OBD-II harness", JST8,
 # inherently safe -- 36 V gives 0.36 mA and even a 100 V load dump gives 1 mA
 # -- so the divider needs no fuse of its own. The parts below exist for the
 # pull-up option, which is a 510 ohm load and does need protecting.
-part(pw, "F", "Device:Fuse", "0.5A slow", "Fuse:Fuse_1206_3216Metric",
-     {"1": "OBD_VBAT", "2": "OBD_VBAT_F"}, "Littelfuse 0466.500NR",
-     "Protects the optional K-line pull-up only. The battery-sense divider "
-     "is 100k and cannot pass enough current to matter")
+part(pw, "PF", "Device:Polyfuse", "0.2A PTC", "Resistor_SMD:R_1812_4532Metric",
+     {"1": "OBD_VBAT", "2": "OBD_VBAT_F"}, "Bourns MF-MSMF020/60-2",
+     "OBD-II pin 16 is PERMANENT battery -- live with the ignition off and "
+     "the car parked -- so the thing being protected against is this board "
+     "failing short across it, which without protection is a fire. A "
+     "resettable PTC rather than a fuse: same job, and it is the same part "
+     "as PF2 so it costs no extra BOM line. 60 V rated, which covers the "
+     "42 V the TVS beside it clamps to. Load is at most 16 mA through the "
+     "optional pull-up against a 200 mA hold",
+     lcsc="C719178")
 part(pw, "D", "Device:D_TVS", "SMAJ26CA", SMA, {"1": "OBD_VBAT_F", "2": "GND"},
      "Diodes Inc SMAJ26CA-13-F",
      "Clamps the OBD 12 V node. 400 W is enough here, not the parent's "
@@ -682,13 +741,28 @@ R(pw, "100k", "SCAP_MID", "GND", note="Cell balancing, lower")
 # the rail the bank looks like a dead short at plug-in: 0.5 F is 4 A into a
 # USB port, which trips the charger and may well be read as a fault by it.
 # 22 ohm holds the inrush to 210 mA and charges in about half a minute.
-R(pw, "22", "+5V", "SCAP_TOP", fp="Resistor_SMD:R_1206_3216Metric",
-  note="Inrush limit. 1206 for the pulse rating: 210 mA into 22 ohm is "
-       "1 W for the first instant, decaying with a 11 s time constant")
-part(pw, "D", "Device:D_Schottky", "SS14", SMA, {"1": "SCAP_TOP", "2": "+5V"},
+R(pw, "100", "+5V", "SCAP_TOP", fp="Resistor_SMD:R_1206_3216Metric",
+  note="Inrush limit, and the value is set by the resistor's own rating "
+       "rather than by the charge time. Charging 0.5 F to 4.7 V dissipates "
+       "0.5*C*V^2 = 5.5 J in here whatever the resistance is; what changes "
+       "is how fast. At 22 ohm the first instant is V^2/R = 1.0 W into a "
+       "1206 rated 0.25 W, and a 1206's thermal time constant is far shorter "
+       "than the 11 s the pulse would last -- it would cook. 100 ohm makes "
+       "the peak 0.22 W, inside the rating, at the cost of a 50 s time "
+       "constant: the hold-up is not fully armed for the first few minutes "
+       "of a drive. A 2010 would buy back the speed if that ever matters")
+# PIN 1 IS THE CATHODE on Device:D_Schottky, and this was the other way round
+# until gen/audit_polarity.py said so. Reversed, it does both of its jobs
+# backwards at once: it shorts out the 100 ohm charge resistor, putting 4 A of
+# inrush into the USB port at plug-in, and it BLOCKS the discharge, so the
+# bank can never hold the rail up and the entire hold-up circuit is inert.
+# Nothing else on this board would have noticed -- ERC, DRC and the netlist
+# compare are all happy with a diode pointing either way.
+part(pw, "D", "Device:D_Schottky", "SS14", SMA, {"1": "+5V", "2": "SCAP_TOP"},
      "SS14", "Discharge path, bypassing the charge resistor. Anode on the "
-     "bank: it conducts only once the rail has sagged a diode drop below the "
-     "bank, which is exactly when the supply has gone away", lcsc="C2480")
+     "bank, cathode on the rail: it conducts only once the rail has sagged a "
+     "diode drop below the bank, which is exactly when the supply has gone "
+     "away", lcsc="C2480")
 
 # ---- power-fail detect ---------------------------------------------------
 # Sensed on the 5 V rail itself. The parent could do better -- it sensed
@@ -702,9 +776,13 @@ part(pw, "D", "Device:D_Schottky", "SS14", SMA, {"1": "SCAP_TOP", "2": "+5V"},
 # parent: the ESP32's input threshold is only specified between 0.25*VDD and
 # 0.75*VDD, which is a 1.7 V window of "could be either". The shunt
 # reference makes the trip point +/-1 %.
-R(pw, "28.7k 1%", "+5V", "PFD_SENSE", note="Power-fail divider, upper leg")
-R(pw, "12.0k 1%", "PFD_SENSE", "GND",
-  note="Lower leg: trips at 1.24V * 40.7/12.0 = 4.20V. The rail sits at "
+# 43k/18k, not the 28.7k/12.0k this started as. Same trip point to within a
+# couple of millivolts -- 1.24 * 61/18 = 4.202 V against 4.204 -- but both of
+# these are stocked 1% parts and 28.7k is not, so the pair costs nothing to
+# buy and nothing to substitute later.
+R(pw, "43k 1%", "+5V", "PFD_SENSE", note="Power-fail divider, upper leg")
+R(pw, "18k 1%", "PFD_SENSE", "GND",
+  note="Lower leg: trips at 1.24V * 61/18 = 4.202V. The rail sits at "
        "4.5-4.7V loaded (USB 5 V less the dev board's Schottky and the cable "
        "drop), and the LDO above holds 3.3 V down to about 3.6 V in, so 4.20 "
        "is inside the margin at both ends")
@@ -724,7 +802,8 @@ R(pw, "10k", "+3V3", "PWR_FAIL",
   note="Cathode pull-up. 10k gives the part 330uA, over the TLV431's 100uA "
        "minimum cathode current")
 R(pw, "1M", "PWR_FAIL", "PFD_SENSE",
-  note="Hysteresis, about 0.1 V at the rail. A USB rail is noisier than a "
+  note="Hysteresis. The sense node sees 43k||18k = 12.7k, so 3.3 V through "
+       "1M moves it 42 mV, which is 142 mV referred to the rail. A USB rail is noisier than a "
        "battery and the trip point is only 300 mV below the working level, "
        "so this matters more here than it did on the parent")
 C(pw, "1nF 50V", "PFD_SENSE", "GND",
@@ -735,10 +814,14 @@ C(pw, "1nF 50V", "PFD_SENSE", "GND",
 # ride-through lasted; with 2.5 s of budget there is nothing to shed, and
 # dropping it frees GPIO16 as well as six parts. The protection stays --
 # these wires run into an engine bay whatever powers them.
-part(pw, "PF", "Device:Polyfuse", "0.2A PTC", "Resistor_SMD:R_1206_3216Metric",
-     {"1": "+5V", "2": "VSENS_F"}, "Bourns MF-MSMF020",
+part(pw, "PF", "Device:Polyfuse", "0.2A PTC", "Resistor_SMD:R_1812_4532Metric",
+     {"1": "+5V", "2": "VSENS_F"}, "Bourns MF-MSMF020/60-2",
      "Resettable: a shorted sensor wire trips this, not the dev board's USB "
-     "port", lcsc="C719178")
+     "port. 1812, NOT 1206: Bourns' MSMF series is an 1812 part and this "
+     "footprint said 1206 all the way from the parent board -- a 4.5 x 3.2 mm "
+     "body on a 3.2 x 1.6 mm land, which does not solder. Caught by checking "
+     "the package field on the part number, not by any DRC",
+     lcsc="C719178")
 part(pw, "FB", "Device:L", "600R", "Inductor_SMD:L_0805_2012Metric",
      {"1": "VSENS_F", "2": "+5VS"}, "Wurth 742792022")
 C(pw, "10uF 16V", "+5VS", "GND", fp=C1206)
@@ -908,9 +991,10 @@ C(mc, "100nF 16V", "+5V", "GND", note="AHCT decoupling")
 R(mc, "100", "LED_DIN", "LED_DIN_J",
   note="Series termination into the strip. The buffer drove the connector "
        "directly, and a WS2812 strip is metres of unterminated lead")
-part(mc, "PF", "Device:Polyfuse", "0.5A hold", "Resistor_SMD:R_1206_3216Metric",
-     {"1": "+5V", "2": "LED_5V"}, "Bourns MF-MSMF050",
-     "Fused tap for the shift-light strip (8x WS2812 ~0.5 A worst case)",
+part(mc, "PF", "Device:Polyfuse", "0.5A hold", "Resistor_SMD:R_1812_4532Metric",
+     {"1": "+5V", "2": "LED_5V"}, "Bourns MF-MSMF050-2",
+     "Fused tap for the shift-light strip (8x WS2812 ~0.5 A worst case). "
+     "1812, same correction as PF2 -- see the note there",
      lcsc="C17313")
 part(mc, "J", "Connector_Generic:Conn_01x03", "WS2812", HDR3,
      {"1": "LED_5V", "2": "LED_DIN_J", "3": "GND"},
@@ -1060,14 +1144,17 @@ R(cn, "100k", "K_TX_G", "GND",
        "permanently dominant, which jams diagnostics for every other tool "
        "on the bus -- a failure that looks like a dead car, not a dead "
        "shield")
-R(cn, "33", "K_TX_D", "K_LINE", fp="Resistor_SMD:R_1206_3216Metric",
-  note="Series limit. ISO 9141-2 wants the tester's dominant below 0.2*Vb: "
-       "against the ECU's 510 ohm alone that is 12*33/543 = 0.73 V, and with "
-       "the optional pull-up below also stuffed it is 1.38 V, both inside "
-       "2.4 V. Sized down from 100 ohm for exactly that second case. A "
-       "sustained short of K-line to battery while transmitting puts 364 mA "
-       "through the FET, over its 115 mA continuous rating -- it survives "
-       "the pulse, not the fault. 1206 for the same reason")
+R(cn, "20", "K_TX_D", "K_LINE", fp="Resistor_SMD:R_1206_3216Metric",
+  note="Series limit, and the value is set by the worst of the two pull-up "
+       "cases. ISO 9141-2 wants the tester's dominant below 0.2*Vb = 2.4 V. "
+       "Including the FET's roughly 18 ohm Rds(on) at a 3.3 V gate the leg "
+       "is about 38 ohm, so against the ECU's 510 ohm alone the dominant is "
+       "12*38/548 = 0.83 V, and with the optional 750 ohm below also stuffed "
+       "(304 ohm combined) it is 1.33 V. Both clear. 33 ohm would also have "
+       "worked and 100 ohm would not, but 20 is what exists in 1206. A "
+       "sustained short of K-line to battery while transmitting puts about "
+       "316 mA through the FET, over its 115 mA continuous rating -- it "
+       "survives the pulse, not the fault. 1206 carries the pulse energy")
 
 # --- receive: divider, clamped -------------------------------------------
 # The ratio cannot avoid clamping and it is worth writing down why. The GPIO
@@ -1096,9 +1183,12 @@ part(cn, "JP", "Jumper:SolderJumper_2_Open", "KPU (default OFF)", SJ2,
      {"1": "OBD_VBAT_F", "2": "K_PU"},
      note="Ships OPEN. Bridge only if a module will not answer without a "
           "tester pull-up on the K-line")
-R(cn, "510", "K_PU", "K_LINE", fp="Resistor_SMD:R_1206_3216Metric",
-  note="The ISO 9141-2 tester pull-up value. 1206: 12 V across it while the "
-       "line is dominant is 280 mW")
+R(cn, "750", "K_PU", "K_LINE", fp="Resistor_SMD:R_1206_3216Metric",
+  note="The tester pull-up. ISO 9141-2 names 510 ohm; 750 is what exists in "
+       "1206 and it is the better number here anyway -- the value is not "
+       "critical, the ECU provides the real pull-up, and 750 dissipates "
+       "12^2/750 = 190 mW while the line is dominant against 510's 280 mW, "
+       "which a 1206 rated 250 mW could not have carried")
 part(cn, "TP", "Connector:TestPoint", "K_LINE", TP, {"1": "K_LINE"})
 
 # --------------------------------------------------------- second CAN ----
@@ -1126,7 +1216,7 @@ part(cn, "U", "Interface_CAN_LIN:MCP2517FD-xSL", "MCP2518FD", SOIC14,
       "5": "XTAL2", "6": "XTAL1", "7": "GND",
       "10": "CAN2_SCK", "11": "CAN2_MOSI", "12": "CAN2_MISO",
       "13": "CAN2_CS", "14": "+3V3"},
-     "MCP2518FDT-H/SL", lcsc="C2148396",
+     "MCP2518FDT-H/SL", lcsc="C626759",
      note="Second CAN controller, on SPI. Pin 11 SDI is the controller's "
           "input, so it lands on the MCU's MOSI; pin 12 SDO is its output "
           "and lands on MISO -- naming them CAN2_MOSI/CAN2_MISO here keeps "
@@ -1139,14 +1229,18 @@ C(cn, "100nF 16V", "+3V3", "GND", note="MCP2518FD decoupling, at pin 14")
 C(cn, "1uF 16V", "+3V3", "GND", note="MCP2518FD bulk")
 part(cn, "Y", "Device:Crystal_GND24", "40MHz", XTAL4,
      {"1": "XTAL1", "3": "XTAL2", "2": "GND", "4": "GND"},
-     "40MHz 10ppm 3225", lcsc="C255909",
+     "TX322540M4FBCE2T", lcsc="C5186937",
      note="40 MHz, the top of the three rates the part accepts (4/20/40). "
           "Classic 500 kbit/s would be happy on 20, but 40 is what CAN FD "
-          "data rates need and the crystals cost the same")
-C(cn, "15pF 50V", "XTAL1", "GND", note="Crystal load cap. Value assumes a "
-  "crystal specified for 8 pF CL and about 5 pF of stray -- check CL on the "
-  "part actually bought, an oscillator that starts on the bench and not at "
-  "-20 C is the classic way to get this wrong")
+          "data rates need and the crystals cost the same. This one is "
+          "-40/+85 C and 12 pF CL; the first part picked was -20/+70, which "
+          "a car cabin exceeds in a summer car park")
+C(cn, "15pF 50V", "XTAL1", "GND",
+  note="Crystal load cap, sized for Y1's 12 pF CL: C1=C2=2*(CL - Cstray) = "
+       "2*(12 - 5) = 14 pF, and 15 pF is the nearest E-series value. Re-check "
+       "this if the crystal is substituted -- CL varies part to part, and an "
+       "oscillator that starts on the bench but not at -20 C is the classic "
+       "way to get it wrong")
 C(cn, "15pF 50V", "XTAL2", "GND", note="Crystal load cap")
 
 part(cn, "U", "Interface_CAN_LIN:TJA1051T-3", "TJA1051T/3", SOIC8,
@@ -1242,7 +1336,7 @@ part(an, "J", "Connector_Generic:Conn_01x10", "Sensor harness", JST10,
      "JST B10B-PH-K-S(LF)(SN)",
      "Two 5V excitation pins, two Kelvin sense-ground pins, two current-"
      "carrying grounds, four signals. SENS_RTN must land on the SENSOR's "
-     "ground stud, not on the same stud as pins 9/10", lcsc="C157966")
+     "ground stud, not on the same stud as pins 9/10", lcsc="C158038")
 
 # ONE RANGE, NOT THREE.
 #
@@ -1292,7 +1386,15 @@ for n in range(1, 5):
            "3.1 V the ESP32 ADC can actually use. This value must match the "
            "return attenuator below exactly or the ground correction is "
            "worse than useless" % n)
-    C(an, "100nF 16V", out, "GND", note="Ch%d anti-alias / ADC charge reservoir" % n)
+    C(an, "470nF 50V", out, "GND",
+      note="Ch%d anti-alias. 470nF, not the 100nF this inherited: source "
+           "impedance here is (1k+10k)||2.21k = 1.84k, so 100nF puts the "
+           "corner at 865 Hz -- above the 430 Hz Nyquist of the ADS1115 at "
+           "860 SPS, and well above anything the ESP32's own SAR ADC can "
+           "sample cleanly. That was survivable while 0-5 V was the default "
+           "range (261 Hz) and became the only behaviour when the range "
+           "jumpers went. 470nF gives 184 Hz, which still passes anything a "
+           "wideband does and stops engine noise folding into the log" % n)
     # One SOT-23 series pair: GND -> signal -> +3V3, so the node is clamped a
     # Schottky drop either side of the rails.
     part(an, "D", "Device:D_Schottky_Dual_Series_AKC", "BAT54S", SOT23,
@@ -1316,7 +1418,11 @@ R(an, "2.21k 0.1%", "AGND_SENSE", "GND",
        "two attenuators, so it is only as good as they match. Also what "
        "holds AGND_SENSE at 0 V when nothing is plugged in, so an absent "
        "loom reads as zero offset rather than as a floating reference")
-C(an, "100nF 16V", "AGND_SENSE", "GND", note="Matches the channels' filter")
+C(an, "470nF 50V", "AGND_SENSE", "GND",
+  note="Matches the channels' filter, and this one is not cosmetic: the "
+       "ground correction is the difference of two attenuators, so if their "
+       "corner frequencies differ the subtraction leaves a phase residue on "
+       "every transient. Same value, same dielectric, same part number")
 part(an, "D", "Device:D_Schottky_Dual_Series_AKC", "BAT54S", SOT23,
      {"1": "GND", "3": "AGND_SENSE", "2": "+3V3"}, "MDD BAT54S",
      "Return-sense rail clamp. +/-0.5 V of chassis offset arrives here as "

@@ -44,13 +44,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ = os.path.abspath(os.path.join(HERE, ".."))
 PCB = os.path.join(PROJ, "esp32s3-can-sd-logger.kicad_pcb")
 
-# What each polarised part must connect where. For a 2-pin diode the tuple is
-# (cathode_net, anode_net) -- pin 1 then pin 2.
+# What each polarised part must connect where: (cathode_net, anode_net),
+# which is pin 1 then pin 2 on every KiCad diode symbol.
+#
+# Keyed on the VALUE, not the reference designator. As designators this table
+# went stale the moment the harness was split into two plugs and every part
+# after it renumbered -- D2 stopped being the rail zener and became the
+# hold-up Schottky, so the audit compared the new part against the old rule
+# and reported a mismatch that was real for the wrong reason. Values survive
+# renumbering; designators are an output of assign_refs().
 DIODE_EXPECT = {
-    "D2":  ("+3V3", "GND"),      # 3.6 V zener rail clamp: cathode to the rail
-    "D3":  ("+5VS", "GND"),      # unidirectional TVS on the sensor rail
-    "D4":  ("PWR_LED_K", "+3V3"),# power LED: anode to +3V3, cathode to its resistor
-    "D5":  ("+5V", "VBUS"),      # OR-ing: conducts VBUS -> +5V, blocks the buck back-feeding USB
+    # the hold-up bank's discharge path: conducts bank -> rail, and must NOT
+    # conduct rail -> bank or it shorts out the inrush limiter
+    "SS14":     ("+5V", "SCAP_TOP"),
+    # unidirectional TVS on the sensor rail: cathode to the rail it clamps
+    "SMAJ6.0A": ("+5VS", "GND"),
+    # power LED: anode to +3V3, cathode down through its series resistor
+    "green":    ("PWR_LED_K", "+3V3"),
 }
 
 # BAT54S is a *series* pair in SOT-23: pin 1 = anode of D1, pin 3 = the common
@@ -132,10 +142,11 @@ def main():
         if is_bidirectional(value):
             print("  %-5s %-12s %-11s %-11s %s" % (ref, value, k, a, "bidirectional - orientation free"))
             continue
-        want = DIODE_EXPECT.get(ref)
+        want = DIODE_EXPECT.get(value)
         if want is None:
             print("  %-5s %-12s %-11s %-11s %s" % (ref, value, k, a, "no rule - review by hand"))
-            failures.append("%s: polarised (%s) but no expectation encoded" % (ref, value))
+            failures.append("%s: polarised (%s) but no expectation encoded "
+                            "in DIODE_EXPECT" % (ref, value))
             continue
         ok = (k, a) == want
         if not ok:

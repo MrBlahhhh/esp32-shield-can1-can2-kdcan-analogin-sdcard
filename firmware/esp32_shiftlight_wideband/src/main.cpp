@@ -189,6 +189,7 @@ void updateLEDs();
 bool bleInit();
 void bleWatchdog();
 void shutdown();
+float readBatteryVolts();   // defined below; printStatus() reports it
 
 void IRAM_ATTR onPowerFail() {
   powerFailed = true;
@@ -210,9 +211,13 @@ void printStatus() {
   else if (clientConnected)   ble = "connected";
   else if (NimBLEDevice::getAdvertising()->isAdvertising()) ble = "advertising";
   else                        ble = "IDLE";
-  Serial.printf("rpm %4u  can %s frames/s %-4lu  ble %-11s  sd %s lines %lu\n",
+  // Battery is on the status line as well as in the log. It is the one
+  // reading with no other way to see it live, and its divisor was wrong for
+  // the whole life of the parent board without anything noticing -- putting
+  // it here is what lets gen/simulate_firmware.py hold it to a number.
+  Serial.printf("rpm %4u  can %s frames/s %-4lu  ble %-11s  sd %s lines %lu  batt %.2f\n",
                 rpm, canUp ? "up" : "DOWN", canFrames, ble,
-                sdUp ? "up" : "DOWN", logLines);
+                sdUp ? "up" : "DOWN", logLines, readBatteryVolts());
   canFrames = 0;
 }
 

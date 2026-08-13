@@ -88,8 +88,23 @@ def mounting_holes():
     return out
 
 
+# Footprints whose name does not encode a height, with the body height in mm
+# and an estimated mass. The parent board's tall parts were all SMD
+# electrolytics, whose footprint names carry their dimensions -- CP_Elec_16x22
+# is a 16 mm can 22 mm tall -- so the regex below was the whole story. Nothing
+# on this board is one of those, and the check quietly reported "no parts over
+# 8 mm tall" while sitting under two supercapacitor cans and two 22-way
+# sockets, which are the tallest things here by a wide margin and the ones a
+# car will shake hardest.
+EXTRA_TALL = {
+    # footprint fragment          diameter/width, height mm, mass g
+    "CP_Radial_D8.0mm":           (8.0,  13.0, 2.2),   # 1 F EDLC cell
+    "PinSocket_1x22":             (2.5,   8.5, 1.6),   # dev-board receptacle
+}
+
+
 def tall_parts():
-    """Anything whose 3D model says it stands more than 8 mm off the board."""
+    """Anything that stands more than 8 mm off the board."""
     if not os.path.exists(PCB):
         return []
     t = open(PCB, encoding="utf-8").read()
@@ -104,6 +119,11 @@ def tall_parts():
             d, h = float(m.group(1)), float(m.group(2))
             if h >= 8.0:
                 out.append((rm.group(1), fp, d, h, can_mass_g(d, h)))
+            continue
+        for frag, (d, h, mass) in EXTRA_TALL.items():
+            if frag in fp:
+                out.append((rm.group(1), fp, d, h, mass))
+                break
     return sorted(out, key=lambda r: -r[3])
 
 

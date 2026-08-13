@@ -25,13 +25,36 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_schematic as sch  # noqa: E402
 
-STRAPS = [
-    ("MCU_BOOT", "high", "SPI boot; the button pulls it low only when held"),
-    ("IO3",      "low",  "JTAG strap; the pull-down selects the default"),
-    ("IO45",     "low",  "must be low for 3.3 V flash -- high would feed "
-                         "the flash 1.8 V and brick boot"),
-    ("IO46",     "low",  "download-entry qualifier with GPIO0"),
-    ("MCU_EN",   "high", "reset; must lag 3V3 (RC) and idle high"),
+# Empty, and that is the finding rather than a gap.
+#
+# Every ESP32-S3 strapping pin -- IO0, IO3, IO45, IO46 and EN -- is on the
+# DevKitC-1, which brings its own pull-ups, its own RC on EN and its own
+# buttons. This board must not touch them, and it does not: J2 pins 3, 13
+# and 14 (EN, IO3, IO46) and J3 pins 14 and 15 (IO0, IO45) are all declared
+# no-connect in the socket map.
+#
+# What this file checks now is that they STAY untouched. Listing them here
+# with an expected level would report five floating nets on every run, which
+# is true of this board and irrelevant -- the dev board is what drives them.
+STRAPS = []
+
+# Socket pins carrying a strapping signal. If any of these ever acquires a
+# net, something on this board is fighting the dev board's own bias network,
+# and the failure mode is a board that will not boot in a way that looks like
+# a dead dev board rather than a wiring fault.
+#
+# Keyed on the socket's MPN, not its reference designator. This table said
+# J2/J3 for about ten minutes, which was true until the harness was split
+# into two plugs and every connector after it renumbered -- the sockets
+# became J3/J4 and the audit started checking two nonexistent parts. That is
+# precisely the drift gen/audit_docs.py exists to catch, reproduced inside an
+# audit. Designators are an output of assign_refs(); MPNs are an input.
+SOCKET_STRAP_PINS = [
+    ("ESP32-S3-DevKitC-1 J1", "3",  "EN / RST"),
+    ("ESP32-S3-DevKitC-1 J1", "13", "IO3"),
+    ("ESP32-S3-DevKitC-1 J1", "14", "IO46"),
+    ("ESP32-S3-DevKitC-1 J3", "14", "IO0 / BOOT"),
+    ("ESP32-S3-DevKitC-1 J3", "15", "IO45"),
 ]
 
 
@@ -71,10 +94,43 @@ def main():
             fails.append("%s has an active part attached: %s"
                          % (net, drivers))
 
+    # The real check on a carrier board: the dev board owns its own straps,
+    # and this board must leave every one of them alone. A net appearing on
+    # one of these socket pins means something here is fighting the dev
+    # board's bias network -- and the symptom is a board that will not boot,
+    # looking for all the world like a dead dev board.
+    print("\nSocket pins carrying a strapping signal (must stay open)")
+    # Reference designators are handed out by assign_refs(), which only runs
+    # inside generate_schematic's main(). Importing the module gets the parts
+    # but not their names, so ask for them.
+    sch.assign_refs()
+    by_mpn = {}
+    for sh in sch.SHEETS:
+        for part in sh["parts"]:
+            if part["mpn"]:
+                by_mpn.setdefault(part["mpn"], part)
+    for mpn, pin, what in SOCKET_STRAP_PINS:
+        part = by_mpn.get(mpn)
+        if part is None:
+            fails.append("%r is not on this board -- SOCKET_STRAP_PINS is stale" % mpn)
+            print("  FAIL  %s absent" % mpn)
+            continue
+        ref = part.get("ref", "?")
+        net = part["pins"].get(pin)
+        ok = net is None and pin in part.get("nc", ())
+        print("  %-5s %-3s pin %-3s %-12s %s"
+              % ("ok" if ok else "FAIL", ref, pin, what,
+                 "open, declared no-connect" if ok
+                 else "carries %s" % (net or "nothing, but not declared NC")))
+        if not ok:
+            fails.append("%s pin %s (%s) is not left open: %s"
+                         % (ref, pin, what, net or "undeclared"))
+
     print("\nSummary")
     if not fails:
-        print("    Every strapping pin boots in its required state, and")
-        print("    nothing but resistors, buttons and headers touches them.")
+        print("    No strapping pin is on this board, because the MCU is not")
+        print("    on this board -- and all five socket pins that carry one")
+        print("    are left open, so the dev board's bias network is intact.")
     for f in dict.fromkeys(fails):
         print("  - " + f)
     return 0

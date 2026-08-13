@@ -15,6 +15,7 @@ physical rather than electrical:
                         decoration
   4. thermal            dissipation per part against the copper it sits on
   5. pin coverage       every symbol pin has a pad to land on
+  6. courtyard overlap  a screen for parts stacked on each other
 
 Currents come from RAIL_CURRENT below, which is design intent, not
 measurement -- the polyfuse and regulator ratings that set them are named
@@ -93,6 +94,26 @@ def head(t):
     print("-" * len(t))
 
 
+def courtyard_box(fp):
+    """Board-coordinate bounding box of a footprint's courtyard.
+
+    Summed from the courtyard graphics rather than GetCourtyard(), whose
+    cached polygon is not re-transformed reliably after a rotation. On a
+    saved board every position has settled, but the cache can still be the
+    one built when the footprint was created at the origin.
+    """
+    xs, ys = [], []
+    for g in fp.GraphicalItems():
+        if g.GetLayer() in (pcbnew.F_CrtYd, pcbnew.B_CrtYd):
+            bb = g.GetBoundingBox()
+            xs += [bb.GetLeft(), bb.GetRight()]
+            ys += [bb.GetTop(), bb.GetBottom()]
+    if not xs:
+        return fp.GetBoundingBox(False, False)
+    return pcbnew.BOX2I(pcbnew.VECTOR2I(min(xs), min(ys)),
+                        pcbnew.VECTOR2I(max(xs) - min(xs), max(ys) - min(ys)))
+
+
 def main():
     board = pcbnew.LoadBoard(BOARD)
     fails = []
@@ -137,17 +158,50 @@ def main():
                          "rise, needs %.3f mm for %.2f A"
                          % (net, w, cap, DT_LIMIT, need, amps))
 
+    # ------------------------------------------------ 6. courtyard overlap ----
+    head("6. Courtyard overlaps")
+    # Every pair, not just the hand-placed ones. Uses pcbnew's own geometry,
+    # which applies the footprint transform correctly -- reading the file by
+    # hand does not, because footprint graphics are stored in local
+    # coordinates and a rotated part comes out with its axes swapped.
+    seen = []
+    for fp in board.GetFootprints():
+        bb = fp.GetBoundingBox(False, False)
+        seen.append((fp.GetReference(), bb.GetLeft() / 1e6, bb.GetTop() / 1e6,
+                     bb.GetRight() / 1e6, bb.GetBottom() / 1e6))
+    clashes = []
+    for i in range(len(seen)):
+        for j in range(i + 1, len(seen)):
+            r1, ax1, ay1, ax2, ay2 = seen[i]
+            r2, bx1, by1, bx2, by2 = seen[j]
+            ox, oy = min(ax2, bx2) - max(ax1, bx1), min(ay2, by2) - max(ay1, by1)
+            if ox > 0.01 and oy > 0.01:
+                clashes.append("%s x %s overlap %.2f x %.2f mm" % (r1, r2, ox, oy))
+    # A bounding box is bigger than a courtyard, so near-neighbours show up
+    # here that DRC is happy with. This is a screen, not the gate -- DRC in
+    # gen/build_board.py is the gate.
+    print("    %d footprints, %d bounding-box overlaps (screen only)"
+          % (len(seen), len(clashes)))
+    for c in clashes[:6]:
+        print("      " + c)
+
     # -------------------------------------------------- 2. antenna keepout ----
     head("2. ESP32 antenna keepout")
-    # The generator lays a rule area over the antenna overhang. Test against
-    # that rectangle rather than a guessed band -- the module's own GND pad
-    # row sits just inside the board edge and is not an intruder.
+    # The module is not on this board any more -- it is on the DevKitC-1
+    # plugged into J2/J3, so its antenna radiates from about 8.5 mm above
+    # this laminate rather than off its edge. Copper underneath still
+    # detunes it, and the right mitigation is still a keepout, but WHICH END
+    # of the dev-board outline to put it under cannot be settled without
+    # Espressif's DXF. Until then this check reports the absence rather than
+    # guessing a rectangle: a keepout in the wrong place removes ground
+    # plane where the board needs it and protects nothing.
     kas = [z for z in board.Zones() if z.GetIsRuleArea()]
     ant = max(kas, key=lambda z: z.GetBoundingBox().GetWidth()
               * max(-z.GetBoundingBox().GetTop(), 0), default=None)
     if ant is None or ant.GetBoundingBox().GetTop() >= 0:
-        print("    no antenna keepout found on the board")
-        fails.append("no antenna keepout rule area")
+        print("    no antenna keepout -- the module is on the dev board now,")
+        print("    and which end its antenna sits over needs the DXF first")
+        fails.append("no antenna keepout rule area (blocked on the DevKitC-1 DXF)")
     else:
         bb = ant.GetBoundingBox()
         print("    keepout x %.1f..%.1f  y %.1f..%.1f (overhangs the top edge)"
