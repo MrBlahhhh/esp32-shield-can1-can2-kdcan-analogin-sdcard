@@ -61,7 +61,11 @@ BUILD = os.path.join(PROJ, ".build", "fwsim")
 R53_SKETCH = os.path.join(PROJ, "firmware", "vendor", "r53_shiftlight_wideband", "main.cpp")
 AUTOSPORT_SKETCH = os.path.join(PROJ, "firmware", "esp32_shiftlight_wideband", "src", "main.cpp")
 
-RANGE_5V = 0.5769          # README section 3, the 0-5 V jumper setting
+# The carrier has ONE divider ratio: 2.21 / 13.21, spanning 0-16 V so that a
+# 5 V and a 12 V sensor both fit without a jumper. RANGE_5V is what the R53
+# board's own front end does, and is kept only for the control comparison.
+RANGE_16V = 0.1673
+RANGE_5V = 0.5769          # the s3zero control board, not this one
 ADC_FULLSCALE = 3.10
 
 
@@ -220,10 +224,11 @@ def accuracy_ladder(board, rail="none"):
              "@0 vbat 13.8", "@0 sensorrail 1 " + rail,
              "@0 canid 0x316", "@0 canrate 50", "@0 rpm 1500",
              "@300 ble connect", "@400 ble subscribe 1"]
-    if board == "autosport":
-        # The range jumper only exists on this board; forcing it onto the
-        # control would make the control measure the wrong front end.
-        lines.append("@0 range 1 r5v")
+    # No range override any more. The carrier has ONE divider ratio and the
+    # board model already carries it, so forcing r5v here was overriding the
+    # design with a jumper setting that no longer exists -- the front end
+    # divided by 0.1673 while the scenario insisted on 0.5769, and the
+    # firmware came out reading 250% high. The board is the authority.
     for i, v in enumerate(steps):
         lines.append("@%d sensor 1 %.3f" % (1000 + 400 * i, v))
     return "\n".join(lines) + "\n", steps
@@ -543,13 +548,21 @@ def study_accuracy(exes):
                   % (v, got, err, "ok" if abs(err) < 3.0 else "WRONG"))
         worst[board] = err_max
 
-    # The divider is the whole story: 10k/10k on the R53 board, 11k/15k here.
-    # DIVIDER_GAIN = 2.0 is the reciprocal of 0.5, and this front end is 0.5769.
-    predicted = (RANGE_5V * 2.0 * 1.015 - 1.0) * 100.0
+    # It used to be a gain error and it is now a wiring error, which is a
+    # bigger failure and worth naming as one. The R53 sketch reads its
+    # wideband on GPIO1. On the carrier GPIO1 is K_RX -- there is no analog
+    # front end on it at all -- so the sketch does not read the sensor
+    # wrongly, it reads nothing. Hence the full -100%.
+    #
+    # Had the pin survived, the error would have been the divider: this front
+    # end is 0.1673 against the 0.5 that DIVIDER_GAIN = 2.0 assumes, so the
+    # reading would have come out about 66% low.
+    if_pin_had_survived = (RANGE_16V * 2.0 * 1.015 - 1.0) * 100.0
     check(worst["autosport"] > 10.0,
-          "the hard-coded DIVIDER_GAIN is wrong for this board's front end",
-          "measured %+.1f%%, predicted %+.1f%% from 0.5769 x 2.0 and the ADC's own 1.5%%"
-          % (worst["autosport"], predicted))
+          "the R53 firmware cannot measure the wideband on this board at all",
+          "measured %+.1f%% -- its ADC pin is K_RX here. Even with the pin "
+          "right the divider alone would have put it %+.1f%% out"
+          % (worst["autosport"], if_pin_had_survived))
     check(worst["s3zero"] < 3.0, "the same code is accurate on its own board",
           "worst error %+.1f%% -- the internal ADC's gain error, nothing more"
           % worst["s3zero"])

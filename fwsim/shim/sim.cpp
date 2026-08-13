@@ -22,8 +22,9 @@ namespace sim {
 // the divider ratios are section 3.
 
 static const double R_BYPASS = 1.0000;   // 0-3.3 V, 10k shorted
-static const double R_5V     = 0.5769;   // 0-5 V,  15/26
-static const double R_16V    = 0.1673;   // 0-16 V, 2.21/13.21
+static const double R_5V     = 0.5769;   // 0-5 V,  15/26 (s3zero only now)
+static const double R_16V    = 0.1673;   // 0-16 V, 2.21/13.21 -- the only
+                                         // ratio on the carrier board
 
 static Board make_s3zero() {
   Board b;
@@ -56,20 +57,19 @@ static Board make_autosport() {
   Board b;
   b.name = "autosport";
   const PinDef pins[] = {
-      {4,  ROLE_ANALOG_IN,   "AIN1",       R_5V, RAIL_5VS},
-      {5,  ROLE_ANALOG_IN,   "AIN2",       R_5V, RAIL_5VS},
-      {6,  ROLE_ANALOG_IN,   "AIN3",       R_5V, RAIL_5VS},
-      {7,  ROLE_ANALOG_IN,   "AIN4",       R_5V, RAIL_5VS},
+      {4,  ROLE_ANALOG_IN,   "AIN1",       R_16V, RAIL_5VS},
+      {5,  ROLE_ANALOG_IN,   "AIN2",       R_16V, RAIL_5VS},
+      {6,  ROLE_ANALOG_IN,   "AIN3",       R_16V, RAIL_5VS},
+      {7,  ROLE_ANALOG_IN,   "AIN4",       R_16V, RAIL_5VS},
       // 8.2k / 108.2k, not the 1/11 this model used to carry. The schematic
       // moved to 13.2:1 so a 36 V input would not saturate the ADC, and the
       // model did not follow -- study 0 compares NETS, not ratios, so it
       // could not see the drift.
       {8,  ROLE_VBAT_SNS,    "VBAT_SNS",   8.2 / 108.2, RAIL_NONE},
-      {40, ROLE_SD_PWR_EN,   "SD_PWR_EN",  0.0, RAIL_NONE},
-      {21, ROLE_SD_CD,       "SD_CD",      0.0, RAIL_NONE},
-      {9,  ROLE_SD_BUS,      "SD_D3",      0.0, RAIL_NONE},
-      {10, ROLE_SD_BUS,      "SD_D2",      0.0, RAIL_NONE},
-      {11, ROLE_SD_BUS,      "SD_D1",      0.0, RAIL_NONE},
+      {47, ROLE_SD_PWR_EN,   "SD_PWR_EN",  0.0, RAIL_NONE},
+      {11, ROLE_SD_CD,       "SD_CD",      0.0, RAIL_NONE},
+      // 1-bit SDMMC: D1/D2/D3 do not reach the MCU. Their three pins are the
+      // SPI bus below.
       {12, ROLE_SD_BUS,      "SD_D0",      0.0, RAIL_NONE},
       {13, ROLE_SD_BUS,      "SD_CMD",     0.0, RAIL_NONE},
       {14, ROLE_SD_BUS,      "SD_CLK",     0.0, RAIL_NONE},
@@ -83,14 +83,22 @@ static Board make_autosport() {
       {36, ROLE_PSRAM,       "PSRAM",      0.0, RAIL_NONE},
       {37, ROLE_PSRAM,       "PSRAM",      0.0, RAIL_NONE},
       // IO38 drives the DevKitC-1 v1.1 onboard RGB LED, so SDA moved to IO47.
-      {47, ROLE_I2C_SDA,     "I2C_SDA",    0.0, RAIL_NONE},
-      {39, ROLE_I2C_SCL,     "I2C_SCL",    0.0, RAIL_NONE},
+      {10, ROLE_I2C_SDA,     "I2C_SDA",    0.0, RAIL_NONE},
+      {9,  ROLE_I2C_SCL,     "I2C_SCL",    0.0, RAIL_NONE},
       {48, ROLE_WS2812_DIN,  "LED_DIN_MCU", 0.0, RAIL_NONE},
       // K-line. The pins are modelled so study 0 holds them against the
       // netlist and the sketch can drive them; there is no KWP2000 protocol
       // model behind them yet.
-      {41, ROLE_KLINE_TX,    "K_TX",       0.0, RAIL_NONE},
-      {42, ROLE_KLINE_RX,    "K_RX",       0.0, RAIL_NONE},
+      {2,  ROLE_KLINE_TX,    "K_TX",       0.0, RAIL_NONE},
+      {1,  ROLE_KLINE_RX,    "K_RX",       0.0, RAIL_NONE},
+      // Second CAN bus. An MCP2518FD on SPI, not a second TWAI -- the S3
+      // only has one. Modelled as pins so study 0 holds them against the
+      // netlist; there is no controller model behind them.
+      {39, ROLE_CAN2_SPI,    "CAN2_SCK",   0.0, RAIL_NONE},
+      {40, ROLE_CAN2_SPI,    "CAN2_MOSI",  0.0, RAIL_NONE},
+      {41, ROLE_CAN2_SPI,    "CAN2_MISO",  0.0, RAIL_NONE},
+      {42, ROLE_CAN2_SPI,    "CAN2_CS",    0.0, RAIL_NONE},
+      {21, ROLE_CAN2_INT,    "CAN2_INT",   0.0, RAIL_NONE},
   };
   b.pins.assign(pins, pins + sizeof(pins) / sizeof(pins[0]));
   b.adc_fullscale = 3.10;
@@ -137,6 +145,8 @@ const char* role_name(Role r) {
     case ROLE_SENS_EN: return "sensor-rail enable";
     case ROLE_KLINE_TX: return "K-line transmit";
     case ROLE_KLINE_RX: return "K-line receive";
+    case ROLE_CAN2_SPI: return "second CAN controller, SPI";
+    case ROLE_CAN2_INT: return "second CAN controller, interrupt";
     case ROLE_USB: return "native USB";
     case ROLE_UART: return "UART0";
     case ROLE_SPI: return "SPI breakout";
@@ -953,10 +963,22 @@ bool sd_begin(bool mode_1bit) {
           pwr);
     return false;
   }
-  if (mode_1bit)
-    fault(SEV_WARN, "SD_1BIT",
-          "card mounted in 1-bit mode; this board wires all four data lines for 4-bit SDMMC, "
-          "which is roughly 4x the write throughput");
+  // The check inverted with the board. It used to warn about 1-bit mode,
+  // because all four data lines were wired. D1/D2/D3 went to the second CAN
+  // controller's SPI bus, so 4-bit is now the mistake: the card would be
+  // clocked on three lines that end at a pull-up.
+  if (!mode_1bit && gpio_with_role(ROLE_SD_BUS) >= 0) {
+    int n = 0;
+    const Board& bd = board();
+    for (size_t i = 0; i < bd.pins.size(); i++)
+      if (bd.pins[i].role == ROLE_SD_BUS) n++;
+    if (n < 4)
+      fault(SEV_ERROR, "SD_4BIT",
+            "SD_MMC.begin() asked for 4-bit mode, but this board only wires %d of the "
+            "data lines to the MCU -- D1/D2/D3 stop at the card. The mount will fail or "
+            "read garbage on three of four lanes",
+            n);
+  }
   s.sd_begun = true;
   return true;
 }

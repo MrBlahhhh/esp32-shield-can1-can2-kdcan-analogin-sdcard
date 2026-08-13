@@ -55,19 +55,34 @@
 
 // K-line, not yet driven. Listed so the pin map in this file stays the whole
 // pin map -- a GPIO that is documented nowhere is a GPIO someone reuses.
-#define K_TX_PIN     41           // low-side FET gate; UART TX must be inverted
-#define K_RX_PIN     42           // divided 22k/10k and clamped
+#define K_TX_PIN      2           // low-side FET gate; UART TX must be inverted
+#define K_RX_PIN      1           // divided 22k/10k and clamped
+
+// Second CAN bus: an MCP2518FD on SPI, because the ESP32-S3 has exactly one
+// TWAI peripheral and two buses have to be watched at once. Not driven by
+// this sketch yet; listed so the pin map in this file stays the whole pin
+// map. SDI/SDO on the controller are named from ITS point of view, so they
+// cross over: the controller's SDI is this end's MOSI.
+#define CAN2_SCK_PIN  39
+#define CAN2_MOSI_PIN 40          // -> MCP2518FD SDI
+#define CAN2_MISO_PIN 41          // <- MCP2518FD SDO
+#define CAN2_CS_PIN   42
+#define CAN2_INT_PIN  21
 // These two live on the far socket row from the card itself. They are the
 // only SD signals that do, and deliberately: they are DC, so crossing the
 // board costs nothing, while the six bus lines stay beside the slot.
-#define SD_PWR_EN_PIN 40
-#define SD_CD_PIN     21
+#define SD_PWR_EN_PIN 47
+#define SD_CD_PIN     11
+// 1-BIT SDMMC. D1/D2/D3 are not wired to the MCU at all: those three pins
+// went to the second CAN controller's SPI bus, which needed five and had
+// two spare. The card still pulls all three up -- a card samples DAT3 at
+// power-up and falls into SPI mode if it finds it low -- they just stop
+// there. 1-bit carries about 1.5 MB/s against this logger's <130 kB/s, and
+// bus width does not touch the card's internal write stall, which is the
+// thing the whole hold-up budget is sized around.
 #define SD_CLK_PIN 14
 #define SD_CMD_PIN 13
 #define SD_D0_PIN  12
-#define SD_D1_PIN  11
-#define SD_D2_PIN  10
-#define SD_D3_PIN   9
 
 #define RPM_STALE_MS 2000         // blank the strip if CAN goes quiet
 
@@ -100,7 +115,12 @@ unsigned long canFrames = 0;      // frames since the last status line
 // This is the constant that was wrong on the first port: 2.0 is the reciprocal
 // of the R53 board's 10k/10k, and using it here reads 17 % high all the way up
 // the range. gen/simulate_firmware.py study 3 measures it end to end.
-static const float DIVIDER_GAIN = 1.7334f;
+// 13.21 / 2.21. One divider ratio on this board now, spanning 0-16 V, so a
+// 5 V sensor lands at 0.836 V and a 12 V one at 2.01 V. The 0-5 V range and
+// its 1.7334 went with the range-select jumpers -- see the note above the
+// channel loop in gen/generate_schematic.py for why one fixed ratio is what
+// makes the differential ground correction exact.
+static const float DIVIDER_GAIN = 5.9774f;
 static const int   ESP_ADC_PIN  = 4;       // AIN1 = GPIO4 = ADC1_CH3
 static const int   VBAT_ADC_PIN = 8;       // VBAT_SNS = GPIO8, from OBD-II pin 16
 // 108.2k / 8.2k, not the 11.0 this file inherited. The schematic moved to
@@ -113,8 +133,8 @@ static const float VBAT_DIVIDER = 13.195f;
 // I2C is on the Qwiic header, not the pins the R53 board used — GPIO7 and
 // GPIO8 are the microSD supply enable and card detect here.
 // IO38 is the DevKitC-1 v1.1 onboard RGB LED; SDA lives on IO47 here.
-static const int   ADS_SDA_PIN  = 47;
-static const int   ADS_SCL_PIN  = 39;
+static const int   ADS_SDA_PIN  = 10;
+static const int   ADS_SCL_PIN  =  9;
 static const uint8_t ADS_ADDR   = 0x48;
 static const float   ADS_LSB_MV = 0.125f;  // GAIN_ONE (+-4.096 V)
 
@@ -313,8 +333,8 @@ void sdInit() {
   digitalWrite(SD_PWR_EN_PIN, HIGH);       // the card supply is switched
   delay(10);                               // let the rail come up before clocking
 
-  SD_MMC.setPins(SD_CLK_PIN, SD_CMD_PIN, SD_D0_PIN, SD_D1_PIN, SD_D2_PIN, SD_D3_PIN);
-  if (!SD_MMC.begin("/sdcard", false)) {   // 4-bit: ~4x the write throughput
+  SD_MMC.setPins(SD_CLK_PIN, SD_CMD_PIN, SD_D0_PIN);
+  if (!SD_MMC.begin("/sdcard", true)) {    // 1-bit; see the pin block above
     Serial.println("SD: mount failed");
     return;
   }

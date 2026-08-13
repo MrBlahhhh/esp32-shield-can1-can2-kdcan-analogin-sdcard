@@ -39,8 +39,8 @@ import generate_schematic as sch  # noqa: E402
 
 # ------------------------------------------------------------------ setup ----
 
-BOARD_W = 90.0
-BOARD_H = 78.0
+BOARD_W = 98.0
+BOARD_H = 90.0
 # The carrier is organised around the two sockets the dev board drops into,
 # and they dominate everything. Each is 22 through-holes on a 2.54 mm pitch,
 # so each cuts a 53.3 mm slot through every inner layer -- see the socket map
@@ -50,12 +50,16 @@ BOARD_H = 78.0
 # board is deliberately ASYMMETRIC: the J1 row carries 15 usable pins against
 # J3's 9, so the circuits hanging off it need about twice the room.
 #
-#   left strip    x  2.0 .. 43.0   analog front end, both ADS1115s, CAN,
+#   left strip    x  2.0 .. 37.0   analog front end, both ADS1115s, CAN 1,
 #                                  microSD -- everything on the J1 row
-#   middle strip  x 48.5 .. 66.4   under the dev board. Short parts only:
-#                                  about 7 mm of clearance over the socket
-#   right strip   x 71.4 .. 88.0   K-line, WS2812 buffer, OBD harness,
-#                                  supercaps -- the J3 row and the power bits
+#   middle strip  x 42.5 .. 60.4   under the dev board. Short parts only --
+#                                  about 7 mm over the socket -- and no test
+#                                  points, which would be unreachable there
+#   right strip   x 66.0 .. 90.0   the second CAN and its controller, the
+#                                  K-line, the WS2812 buffer, OBD harness
+#   header column x 91.3 .. 94.8   the three edge headers plus the spare
+#   bottom band   y 72.0 .. 88.0   below the dev board: the test-point row
+#                                  and the two hold-up cells
 #
 # ROW_PITCH IS NOT CONFIRMED. Espressif publish the DevKitC-1's outline only
 # as a DXF and it is not in the HTML user guide. 22.86 mm (0.9 in) is the
@@ -63,9 +67,9 @@ BOARD_H = 78.0
 # board. Get the DXF before ordering -- this one number is the difference
 # between a carrier and a coaster.
 ROW_PITCH = 22.86
-SOCK_X1 = 46.0                 # J2, mirrors the dev board's J1 header
+SOCK_X1 = 40.0                 # J2, mirrors the dev board's J1 header
 SOCK_X2 = SOCK_X1 + ROW_PITCH  # J3
-SOCK_Y = 11.0                  # top pin; the row runs 21 * 2.54 = 53.34 down
+SOCK_Y = 14.0                  # top pin; the row runs 21 * 2.54 = 53.34 down
 DEVKIT_W = 25.5                # dev board body, across the rows
 DEVKIT_L = 63.0                # ... and along them. Also from the DXF, also
                                # unconfirmed -- see ROW_PITCH above.
@@ -172,22 +176,29 @@ FIXED = {
     "ESP32-S3-DevKitC-1 J1":    (SOCK_X1, SOCK_Y, 0),
     "ESP32-S3-DevKitC-1 J3":    (SOCK_X2, SOCK_Y, 0),
 
-    "JST B10B-PH-K-S(LF)(SN)":  (5.0, 5.5, 0),      # sensor harness, top left
-    # Pin 1 is the footprint origin and the pins run +X, so the anchor is the
-    # LEFT end of the body, not its centre. Both of these were placed as if
-    # it were the centre and ended up half off the board.
-    "JST B6B-PH-K-S(LF)(SN)":   (74.0, 5.5, 0),     # OBD harness, top right
-    "Hirose DM3D-SF":           (11.0, 68.0, 0),    # bottom edge, card out
+    # Pin 1 is the footprint origin and the pins run +X, so the anchor is
+    # roughly 2.5 mm right of the body's left edge, not its centre. All three
+    # of these were placed as if it were the centre and landed on a corner
+    # mounting hole -- the clash check now includes the holes, which is what
+    # finally caught it.
+    #
+    # These keys are the MPN. When the OBD harness went from 6 to 8 pins the
+    # key changed with it, the old B6B entry stopped matching anything, and
+    # the connector quietly fell through to the zone packer and was placed
+    # in the middle of the board. Renaming a part renames its FIXED key.
+    "JST B10B-PH-K-S(LF)(SN)":  (12.0, 6.5, 0),     # sensor harness, top left
+    "JST B8B-PH-K-S(LF)(SN)":   (70.0, 6.5, 0),     # OBD harness, top right
+    "Hirose DM3D-SF":           (17.0, 81.0, 0),    # bottom edge, card out
 
     # Headers on the free edges. The dev board covers the middle of this
     # board end to end, so nothing can present a connector there.
     # Rotation 0, not 90: PinHeader_1x0n is drawn with its pins running down
     # +Y, so these three sit as a column against the right edge at 0. At 90
     # they lay across it and overhung the board by 8 mm.
-    "value:WS2812":             (86.5, 27.0, 0),
-    "value:Rail break-out":     (86.5, 39.0, 0),
-    "value:I2C / Qwiic":        (86.5, 52.0, 0),
-    "value:Spare diff in":      (30.0, 3.0, 90),
+    "value:WS2812":             (93.0, 20.0, 0),
+    "value:Rail break-out":     (93.0, 33.0, 0),
+    "value:I2C / Qwiic":        (93.0, 46.0, 0),
+    "value:Spare diff in":      (93.0, 59.0, 0),
 }
 
 # The supercapacitors. Two 8 mm cans, the tallest parts on the board by a
@@ -196,8 +207,11 @@ FIXED = {
 # from the dev board, which sits about 7 mm above the laminate.
 PIN_FIXED = [
     # sheet,             value,   nets,                     x,    y,  rot
-    ("Rails + harness", "1F 2.7V", {"SCAP_TOP", "SCAP_MID"}, (77.0, 60.0, 0)),
-    ("Rails + harness", "1F 2.7V", {"SCAP_MID", "GND"},      (77.0, 70.0, 0)),
+    # Bottom-right corner, below the dev board and as far from it as the
+    # outline allows -- 8 mm cans beside a board sitting 8.5 mm up on sockets
+    # is asking for one to foul the other during assembly.
+    ("Rails + harness", "1F 2.7V", {"SCAP_TOP", "SCAP_MID"}, (72.0, 78.0, 0)),
+    ("Rails + harness", "1F 2.7V", {"SCAP_MID", "GND"},      (83.0, 78.0, 0)),
 ]
 
 # Nothing left to hand-shape: the two LM5164 islands went with the power
@@ -212,7 +226,7 @@ BUCK_FIXED = []
 # bottom pair 6 mm out of line with the top -- which is neither symmetric
 # nor useful.  4 mm is set by H1: any further in and its keepout ring eats
 # into J7, and the top header row has no slack to give.
-HOLES = [(4.0, 4.0), (4.0, 74.0), (86.0, 4.0), (86.0, 74.0)]
+HOLES = [(4.0, 4.0), (4.0, 86.0), (94.0, 4.0), (94.0, 86.0)]
 
 # How much of a zone's spare height may go between its rows.  Silkscreen
 # reference text is 0.8 mm, so a millimetre on top of the 0.4 mm packing gap
@@ -225,36 +239,42 @@ ZONES = [
     # (name, rect, predicate). Shelves filled left-to-right, top-to-bottom;
     # the first predicate that matches a part claims it.
 
+    # A test point under the dev board is a test point you cannot reach: the
+    # DevKitC-1 covers x 38.7..64.2 from one end of the board to the other,
+    # and it is not coming off with the loom plugged in. They all go in one
+    # row along the bottom edge instead, between the microSD socket and the
+    # hold-up cells. This predicate is FIRST so it wins over whatever zone
+    # the probed net would otherwise have put them in.
+    ("testpoints", (28.0, 78.0, 36.0,  4.0), lambda p, n, s: p["prefix"] == "TP"),
+
     # ---- left strip: everything that hangs off the J1 socket row ----------
-    ("harness",   ( 2.0,  2.0, 41.0,  9.0), lambda p, n, s: p["prefix"] == "J" and s == "Analog Inputs"),
-    ("ch1",       ( 2.0, 12.5,  9.8, 30.0), lambda p, n, s: n & {"AIN1_A", "AIN1_PU", "AIN1_R1", "AIN1_R2", "AIN1_IN", "AIN1"}),
-    ("ch2",       (12.2, 12.5,  9.8, 30.0), lambda p, n, s: n & {"AIN2_A", "AIN2_PU", "AIN2_R1", "AIN2_R2", "AIN2_IN", "AIN2"}),
-    ("ch3",       (22.4, 12.5,  9.8, 30.0), lambda p, n, s: n & {"AIN3_A", "AIN3_PU", "AIN3_R1", "AIN3_R2", "AIN3_IN", "AIN3"}),
-    ("ch4",       (32.6, 12.5,  9.8, 30.0), lambda p, n, s: n & {"AIN4_A", "AIN4_PU", "AIN4_R1", "AIN4_R2", "AIN4_IN", "AIN4"}),
+    ("harness",   ( 2.0,  2.0, 35.0,  9.0), lambda p, n, s: p["prefix"] == "J" and s == "Analog Inputs"),
+    ("ch1",       ( 2.0, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN1_A", "AIN1_PU", "AIN1_IN", "AIN1"}),
+    ("ch2",       (10.9, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN2_A", "AIN2_PU", "AIN2_IN", "AIN2"}),
+    ("ch3",       (19.8, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN3_A", "AIN3_PU", "AIN3_IN", "AIN3"}),
+    ("ch4",       (28.7, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN4_A", "AIN4_PU", "AIN4_IN", "AIN4"}),
     # The return attenuator is a fifth channel in everything but name, and it
     # only works if it MATCHES the four above -- same values, same package,
     # same thermal environment. Placed beside them for that reason.
-    ("agnd",      ( 2.0, 43.0, 16.0,  8.0), lambda p, n, s: n & {"SENS_RTN", "AGND_A", "AGND_SENSE"}),
-    ("adc",       (18.5, 43.0, 24.5,  8.0), lambda p, n, s: p["mpn"] == "ADS1115IDGSR" or n & {"AIN_SP1", "AIN_SP2"} or (s == "Analog Inputs" and n <= {"+3V3", "GND"})),
-    ("vbatsns",   ( 2.0, 52.0,  8.0,  7.0), lambda p, n, s: "VBAT_SNS" in n),
-    ("can",       (10.5, 52.0, 32.5, 10.0), lambda p, n, s: s == "CAN + K-line" and not (n & {"K_LINE", "K_TX", "K_RX", "K_TX_G", "K_TX_D", "K_PU"})),
-    ("sd",        (21.0, 62.0, 34.0, 14.0), lambda p, n, s: s == "SD Card"),
+    ("agnd",      ( 2.0, 44.0, 16.0,  8.0), lambda p, n, s: n & {"SENS_RTN", "AGND_A", "AGND_SENSE"}),
+    ("adc",       (18.5, 44.0, 18.5,  8.0), lambda p, n, s: p["mpn"] == "ADS1115IDGSR" or n & {"AIN_SP1", "AIN_SP2"} or (s == "Analog Inputs" and n <= {"+3V3", "GND"})),
+    ("vbatsns",   ( 2.0, 53.0,  8.0,  7.0), lambda p, n, s: "VBAT_SNS" in n),
+    ("can1",      (10.5, 53.0, 26.5, 11.0), lambda p, n, s: s == "CAN + K-line" and n & {"CAN_H", "CAN_L", "CANH_T", "CANL_T", "CAN_TX", "CAN_RX", "CAN_S", "TERM_A", "CAN_SPLIT"}),
+    ("sd",        ( 2.0, 65.0, 35.0, 12.0), lambda p, n, s: s == "SD Card"),
 
-    # ---- right strip: the J3 row, plus the parts with no MCU pin at all ---
-    ("kline",     (71.5, 11.0, 13.0, 21.0), lambda p, n, s: n & {"K_LINE", "K_TX", "K_RX", "K_TX_G", "K_TX_D", "K_PU"}),
-    ("ws2812",    (71.5, 33.0, 13.0,  9.0), lambda p, n, s: n & {"LED_DIN_MCU", "LED_DIN_A", "LED_DIN", "LED_5V"}),
-    # The supercaps are 8 mm cans and the tallest things here by a wide
-    # margin, so they go at the board edge rather than under the dev board.
-    ("holdup",    (71.5, 43.0, 13.0,  9.0), lambda p, n, s: n & {"SCAP_TOP", "SCAP_MID"}),
+    # ---- right strip: the J3 row -----------------------------------------
+    # The second CAN gets the most room of anything here: a controller, its
+    # crystal, a transceiver, a choke, split termination and the two aux
+    # jumpers. It sits nearest the J3 pins carrying its SPI bus.
+    ("can2",      (66.0, 13.0, 24.0, 32.0), lambda p, n, s: n & {"CAN2_TXD", "CAN2_RXD", "CAN2_INT", "CAN2_SCK", "CAN2_MOSI", "CAN2_MISO", "CAN2_CS", "XTAL1", "XTAL2", "CAN2H_T", "CAN2L_T", "CAN2_H_C", "CAN2_L_C", "CAN2_S", "TERM2_A", "CAN2_SPLIT", "AUX_A", "AUX_B"}),
+    ("kline",     (66.0, 46.0, 24.0, 16.0), lambda p, n, s: n & {"K_LINE", "K_TX", "K_RX", "K_TX_G", "K_TX_D", "K_PU"}),
+    ("ws2812",    (66.0, 63.0, 24.0,  8.0), lambda p, n, s: n & {"LED_DIN_MCU", "LED_DIN_A", "LED_DIN", "LED_5V"}),
+    ("holdup",    (66.0, 72.0, 24.0,  4.0), lambda p, n, s: n & {"SCAP_TOP", "SCAP_MID"}),
 
     # ---- middle strip: under the dev board, short parts only -------------
-    ("pfd",       (48.5, 11.0, 17.9, 12.0), lambda p, n, s: n & {"PFD_SENSE", "PWR_FAIL"}),
-    ("sens5v",    (48.5, 24.0, 17.9, 10.0), lambda p, n, s: n & {"VSENS_F", "+5VS"}),
-    # The Dev board sheet's own parts -- I2C pull-ups and rail decoupling --
-    # used to have a shelf in the right strip. They lost it to the hold-up
-    # cells and moved here, under the dev board, which is where the I2C bus
-    # they pull up actually runs.
-    ("decoup",    (48.5, 35.0, 17.9, 30.0), lambda p, n, s: True),
+    ("pfd",       (42.5, 14.0, 17.9, 12.0), lambda p, n, s: n & {"PFD_SENSE", "PWR_FAIL"}),
+    ("sens5v",    (42.5, 27.0, 17.9, 10.0), lambda p, n, s: n & {"VSENS_F", "+5VS"}),
+    ("decoup",    (42.5, 38.0, 17.9, 30.0), lambda p, n, s: True),
 ]
 
 
@@ -384,11 +404,13 @@ def main():
             board.Add(sh)
         t = pcbnew.PCB_TEXT(board)
         t.SetText("ESP32-S3-DevKitC-1")
-        t.SetPosition(pt(cx, y0 + l / 2.0))
+        # Just inside the top edge of the outline, horizontal. Centred and
+        # rotated it ran the length of the board straight through the
+        # middle-strip parts -- legible in a plot, unreadable on a board.
+        t.SetPosition(pt(cx, y0 + 2.2))
         t.SetLayer(pcbnew.F_SilkS)
-        t.SetTextSize(pcbnew.VECTOR2I(mm(1.2), mm(1.2)))
-        t.SetTextThickness(mm(0.2))
-        t.SetTextAngle(pcbnew.EDA_ANGLE(90, pcbnew.DEGREES_T))
+        t.SetTextSize(pcbnew.VECTOR2I(mm(1.0), mm(1.0)))
+        t.SetTextThickness(mm(0.15))
         board.Add(t)
     devkit_outline()
 
@@ -492,10 +514,17 @@ def main():
     if unused:
         print("WARNING: %d BUCK_FIXED entries matched no part" % unused)
 
-    # Report courtyard overlaps between fixed parts so BUCK_FIXED can be
-    # tuned against real numbers instead of guesses.
+    # Report courtyard overlaps between fixed parts so the tables above can
+    # be tuned against real numbers instead of guesses.
+    #
+    # The mounting holes are in this list too, and they were not. That gap
+    # let the microSD socket, the sensor harness and the OBD harness all sit
+    # on top of a hole -- three of the eleven fixed parts, none of them
+    # flagged, because the check only ever compared fixed parts to each
+    # other. A hole is a part: it has a courtyard, it has a keepout ring, and
+    # a screw through it does not care that the netlist is clean.
     boxes = []
-    for fp in fixed_parts:
+    for fp in list(fixed_parts) + list(hole_parts):
         bb = courtyard_box(fp)
         boxes.append((fp.GetReference(), fp.GetValue()[:14],
                       pcbnew.ToMM(bb.GetLeft()), pcbnew.ToMM(bb.GetTop()),

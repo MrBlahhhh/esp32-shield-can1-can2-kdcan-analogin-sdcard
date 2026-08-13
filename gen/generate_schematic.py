@@ -400,7 +400,10 @@ SMA = "Diode_SMD:D_SMA"
 SOD123 = "Diode_SMD:D_SOD-123"
 LED0805 = "LED_SMD:LED_0805_2012Metric"
 JST6 = "Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical"
+JST8 = "Connector_JST:JST_PH_B8B-PH-K_1x08_P2.00mm_Vertical"
 JST10 = "Connector_JST:JST_PH_B10B-PH-K_1x10_P2.00mm_Vertical"
+SOIC14 = "Package_SO:SOIC-14_3.9x8.7mm_P1.27mm"
+XTAL4 = "Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm"
 HDR3 = "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
 HDR4 = "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
 HDR6 = "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical"
@@ -595,16 +598,20 @@ pw = sheet(
 #   J   OBD-II   what
 #   1   16       battery + (permanent). SENSE ONLY -- see the note below
 #   2   4/5      chassis / signal ground
-#   3   6        CAN_H
+#   3   6        CAN_H     bus 1, D-CAN on a BMW/MINI
 #   4   14       CAN_L
-#   5   7        K-line
-#   6   4/5      ground, second pin so the pair can be twisted with K-line
-part(pw, "J", "Connector_Generic:Conn_01x06", "OBD-II harness", JST6,
+#   5   7        AUX_A     K-line, OR the second bus's CAN_H
+#   6   -        AUX_B     unused in K-line mode, CAN_L for the second bus
+#   7   4/5      ground, so the CAN1 pair can be twisted with a return
+#   8   4/5      ground, ditto for the aux pair
+part(pw, "J", "Connector_Generic:Conn_01x08", "OBD-II harness", JST8,
      {"1": "OBD_VBAT", "2": "GND", "3": "CAN_H", "4": "CAN_L",
-      "5": "K_LINE", "6": "GND"},
-     "JST B6B-PH-K-S(LF)(SN)",
-     "OBD-II pins 16/4/6/14/7/5. Pin 1 is sense only -- the board is powered "
-     "from the dev board's USB-C, not from here", lcsc="C157964")
+      "5": "AUX_A", "6": "AUX_B", "7": "GND", "8": "GND"},
+     "JST B8B-PH-K-S(LF)(SN)",
+     "Pins 3/4 are the first CAN bus, always. Pins 5/6 are the second port "
+     "and what they carry is a solder-jumper choice -- K-line on AUX_A, or "
+     "the second CAN pair. Pin 1 is sense only: the board is powered from "
+     "the dev board's USB-C, not from here", lcsc="C157974")
 
 # OBD pin 16 is permanent battery, so it is live whenever the harness is
 # plugged in, ignition or not. Nothing on this board is powered from it: it
@@ -778,15 +785,16 @@ mc = sheet("Dev board", "mcu.kicad_sch",
 #
 # So the pins are grouped by which SIDE of the board their circuit lives on:
 #
-#   J1 row, left of the board   analog front end + both ADS1115s (pins 4-7,12)
-#                               power-fail (8), CAN (9-11), microSD bus (15-20)
-#   J3 row, right of the board  K-line (6,7), I2C (9,17), WS2812 (16),
-#                               SD card-detect and supply-enable (8,18)
+#   J1 row, left of the board   analog front end + both ADS1115s (pins 4-7,
+#                               12), power-fail (8), CAN 1 (9-11), I2C
+#                               (15,16), microSD (17-20)
+#   J3 row, right of the board  K-line (4,5), CAN 2's SPI bus (6-9,18),
+#                               WS2812 (16), SD supply-enable (17)
 #
-# Four nets have to get from one side to the other: SDA, SCL, SD_CD and
-# SD_PWR_EN. All four are DC or 400 kHz, and all four route AROUND the end of
-# the row rather than through it, so nothing crosses a plane slot at all. The
-# SD bus, the CAN pair and the four analog channels each stay on their own
+# One net has to get from one side to the other: SD_PWR_EN, which is a load-
+# switch gate and therefore DC. It routes AROUND the end of the row rather
+# than through it, so nothing crosses a plane slot at all. The SD bus, both
+# CAN pairs, the SPI bus and the four analog channels each stay on their own
 # side by construction.
 #
 # Two constraints made this land with nothing spare. ADC1 is GPIO1-10 and
@@ -796,8 +804,9 @@ mc = sheet("Dev board", "mcu.kicad_sch",
 # SD_CD and SD_PWR_EN onto J3, and they are the right two to exile: a
 # mechanical switch and a load-switch gate.
 #
-# IO1 and IO2 stay free on J3, and they are ADC1, so two more analog channels
-# are possible later without moving anything.
+# There is nothing spare left. All 24 usable pins are allocated: 15 on J1 and
+# 9 on J3. IO1 and IO2 were the last two free and the second CAN's interrupt
+# and the K-line took them.
 #
 # POWER: the shield consumes both rails and generates neither. 5 V comes UP
 # from the dev board on J1 pin 21 (its USB VBUS, behind its own Schottky) and
@@ -821,9 +830,16 @@ part(mc, "J", "Connector_Generic:Conn_01x22", "DevKit J1", SOCK22,
          "9": "CAN_S", "10": "CAN_TX", "11": "CAN_RX",
          "12": "VBAT_SNS",           # IO8, the fifth ADC1 pin
          # 13 (IO3) and 14 (IO46) are strapping pins and stay unconnected.
-         # --- microSD bus, bottom of the row, six contiguous pins ---
-         "15": "SD_D3", "16": "SD_D2", "17": "SD_D1", "18": "SD_D0",
-         "19": "SD_CMD", "20": "SD_CLK",
+         # --- I2C, then the microSD bus, at the bottom of the row ---
+         "15": "I2C_SCL", "16": "I2C_SDA",
+         "17": "SD_CD",
+         # 1-BIT SDMMC, not 4-bit. D1/D2/D3 no longer reach the MCU: their
+         # three pins went to the second CAN controller's SPI bus, which
+         # needed five and had two. 1-bit still moves about 1.5 MB/s against
+         # this logger's sub-100 kB/s, and it does not touch the flush margin
+         # -- that is the card's internal write time, not the bus width.
+         # The card's own D1/D2/D3 keep their pull-ups; see the SD sheet.
+         "18": "SD_D0", "19": "SD_CMD", "20": "SD_CLK",
          "21": "+5V", "22": "GND",
      },
      mpn="ESP32-S3-DevKitC-1 J1",
@@ -837,35 +853,35 @@ part(mc, "J", "Connector_Generic:Conn_01x22", "DevKit J3", SOCK22,
      {
          "1": "GND",
          # 2, 3 are IO43/IO44, the dev board's own UART0 console -- left to it.
-         # 4, 5 are IO1/IO2. Free, and both ADC1: two more analog channels
-         # are available here without disturbing anything above.
-         # 6, 7, 8 are IO42/IO41/IO40, and 9 is IO39. All four are the
-         # ESP32-S3's EXTERNAL JTAG pins (MTMS/MTDI/MTDO/MTCK), which sounds
-         # worse than it is: the S3 defaults to the USB-Serial-JTAG bridge on
-         # IO19/20 for debugging, so these are ordinary GPIO unless an eFuse
-         # says otherwise.
-         "6": "K_RX", "7": "K_TX",
-         "8": "SD_PWR_EN",           # DC, so crossing sides costs nothing
-         "9": "I2C_SCL",
+         # 4, 5 are IO1/IO2, the last two pins that were spare. K-line takes
+         # them, and adjacent, so its FET and divider sit together.
+         "4": "K_RX", "5": "K_TX",
+         # 6, 7, 8, 9 are IO42/IO41/IO40/IO39 -- four contiguous pins for the
+         # second CAN controller's SPI bus, which is the whole reason they
+         # were kept together. All four are the ESP32-S3's EXTERNAL JTAG pins
+         # (MTMS/MTDI/MTDO/MTCK), which sounds worse than it is: the S3
+         # defaults to the USB-Serial-JTAG bridge on IO19/20 for debugging,
+         # so these are ordinary GPIO unless an eFuse says otherwise.
+         "6": "CAN2_CS", "7": "CAN2_MISO", "8": "CAN2_MOSI", "9": "CAN2_SCK",
          # 10 is IO38, which drives the DevKitC-1 v1.1's onboard addressable
          # RGB LED -- using it for I2C would flicker the LED on every
          # transaction and hang its input capacitance on the bus.
          # 11-13 are IO37/36/35, consumed by the module's octal PSRAM.
          # 14 is IO0 (BOOT) and 15 is IO45, both the dev board's business.
          "16": "LED_DIN_MCU",
-         "17": "I2C_SDA",            # IO47, free and not a strapping pin
-         "18": "SD_CD",              # a mechanical switch; DC
+         "17": "SD_PWR_EN",          # a load-switch gate; DC, so it may cross
+         "18": "CAN2_INT",           # IO21
          # 19, 20 are IO20/IO19, wired to the dev board's native USB port.
          "21": "GND", "22": "GND",
      },
      mpn="ESP32-S3-DevKitC-1 J3",
-     note="Mirrors DevKitC-1 J3. K-line on 6/7, I2C on 9/17, WS2812 on 16, "
-          "and the SD card's two DC control lines on 8/18 -- the only nets "
-          "that cross to the other side of the board, and they go round the "
-          "end of the row. Pin 10 (IO38) is left open because it drives the "
+     note="Mirrors DevKitC-1 J3. K-line on 4/5, the second CAN's SPI on "
+          "6-9 with its interrupt on 18, WS2812 on 16. Pin 17 is SD_PWR_EN, "
+          "the one net that crosses to the other side of the board, and it "
+          "goes round the end of the row. Pin 10 (IO38) is left open because it drives the "
           "dev board's RGB LED on v1.1; check the revision, some put it on "
           "IO48, which is the WS2812 output here.",
-     nc=("2", "3", "4", "5", "10", "11", "12", "13", "14", "15", "19", "20"))
+     nc=("2", "3", "10", "11", "12", "13", "14", "15", "19", "20"))
 
 # Decoupling for the shield's own 3V3 loads. The module's decoupling went with
 # the module; this is what the ADS1115, the analog dividers and the SD
@@ -956,19 +972,28 @@ R(sd, "100k", "SD_EN_G", "GND")
 C(sd, "10uF 16V", "SD_VDD", "GND", fp=C1206)
 C(sd, "100nF 16V", "SD_VDD", "GND")
 
-for sig in ["CLK", "CMD", "D0", "D1", "D2", "D3"]:
+# 1-BIT SDMMC. Only CLK, CMD and D0 reach the MCU -- the three pins D1/D2/D3
+# used to take went to the second CAN controller's SPI bus.
+for sig in ["CLK", "CMD", "D0"]:
     R(sd, "33", "SD_" + sig, "SD_%s_C" % sig, note="Series damping")
+# The card's unused data lines still need pulling up, and this is not
+# optional tidiness: an SD card samples DAT3 at power-up and drops into SPI
+# mode if it finds it low. DAT1 and DAT2 float into the ESD array and the
+# card's own input if left alone. So all three keep their pull-ups and their
+# clamps, and simply stop at the card -- there is no net from here to the
+# socket rows at all.
 for sig in ["CMD", "D0", "D1", "D2", "D3"]:
     R(sd, "10k", "SD_VDD", "SD_%s_C" % sig,
       note="Espressif's recommended value; pulled to the switched rail so "
-           "nothing back-feeds a powered-down card")
+           "nothing back-feeds a powered-down card. For D1/D2/D3 this is now "
+           "the ONLY thing on the net besides the card and its ESD clamp")
 # Card detect is a slow mechanical contact, not a bus line, so it keeps the
 # weaker pull-up -- less standing current with a card inserted.
 R(sd, "47k", "+3V3", "SD_CD", note="Card-detect pull-up")
 
 # ----------------------------------------------------------------- CAN ----
 cn = sheet("CAN + K-line", "can.kicad_sch",
-           "CAN 2.0B with selectable termination, plus an ISO 9141 K-line interface")
+           "Two independent CAN nodes and an ISO 9141 K-line interface")
 
 part(cn, "U", "Interface_CAN_LIN:TJA1051T-3", "TJA1051T/3", SOIC8,
      {"1": "CAN_TX", "2": "GND", "3": "+5V", "4": "CAN_RX", "5": "+3V3",
@@ -1022,11 +1047,6 @@ part(cn, "TP", "Connector:TestPoint", "CAN_L", TP, {"1": "CAN_L"})
 # = bus low), RX is not. The ESP32-S3 UART inverts each signal separately in
 # hardware, so uart_set_line_inverse(port, UART_SIGNAL_TXD_INV) is the entire
 # software cost.
-part(cn, "D", "Device:D_TVS", "SMAJ26CA", SMA, {"1": "K_LINE", "2": "GND"},
-     "Diodes Inc SMAJ26CA-13-F",
-     "K-line harness clamp. Same part as the two CAN clamps, so it is one "
-     "BOM line for three positions", lcsc="C134976")
-
 # --- transmit: low-side switch -------------------------------------------
 part(cn, "Q", "Device:Q_NMOS_GSD", "2N7002", SOT23,
      {"1": "K_TX_G", "2": "GND", "3": "K_TX_D"}, "onsemi 2N7002",
@@ -1081,6 +1101,103 @@ R(cn, "510", "K_PU", "K_LINE", fp="Resistor_SMD:R_1206_3216Metric",
        "line is dominant is 280 mW")
 part(cn, "TP", "Connector:TestPoint", "K_LINE", TP, {"1": "K_LINE"})
 
+# --------------------------------------------------------- second CAN ----
+# TWO BUSES AT ONCE NEEDS A SECOND CONTROLLER, NOT A SECOND TRANSCEIVER.
+#
+# The ESP32-S3 has exactly one TWAI peripheral. Two transceivers hung off it
+# would give a choice of bus, selectable at runtime through the GPIO matrix,
+# but never both live -- and the point of a second bus is watching the
+# powertrain and the body bus at the same time. So the second channel is a
+# whole CAN controller on SPI, and the ESP32 only sees registers.
+#
+# MCP2517FD in SOIC-14. The MCP2518FD is the same pinout with newer silicon
+# and fits this footprint -- KiCad only ships the 2517 symbol, and the two
+# are interchangeable here. Either does CAN FD, which nothing on this car
+# needs today and costs nothing to keep.
+#
+# THE PIN COST, PAID FROM THE SD CARD. SPI needs SCK, SDI, SDO, nCS and an
+# interrupt: five pins, against two spare. The three came from dropping the
+# microSD from 4-bit to 1-bit mode, which is a real trade and a cheap one --
+# 1-bit SDMMC still moves about 1.5 MB/s and this logger writes under
+# 100 kB/s. It does not touch the flush-latency margin either, because that
+# is the card's internal write time, not the bus width.
+part(cn, "U", "Interface_CAN_LIN:MCP2517FD-xSL", "MCP2518FD", SOIC14,
+     {"1": "CAN2_TXD", "2": "CAN2_RXD", "4": "CAN2_INT",
+      "5": "XTAL2", "6": "XTAL1", "7": "GND",
+      "10": "CAN2_SCK", "11": "CAN2_MOSI", "12": "CAN2_MISO",
+      "13": "CAN2_CS", "14": "+3V3"},
+     "MCP2518FDT-H/SL", lcsc="C2148396",
+     note="Second CAN controller, on SPI. Pin 11 SDI is the controller's "
+          "input, so it lands on the MCU's MOSI; pin 12 SDO is its output "
+          "and lands on MISO -- naming them CAN2_MOSI/CAN2_MISO here keeps "
+          "that straight, because SDI/SDO on a peripheral means the "
+          "opposite of what it means on a host. VERIFY THE PART NUMBER "
+          "against the live catalogue before ordering, as with every other "
+          "line on this board",
+     nc=("3", "8", "9"))
+C(cn, "100nF 16V", "+3V3", "GND", note="MCP2518FD decoupling, at pin 14")
+C(cn, "1uF 16V", "+3V3", "GND", note="MCP2518FD bulk")
+part(cn, "Y", "Device:Crystal_GND24", "40MHz", XTAL4,
+     {"1": "XTAL1", "3": "XTAL2", "2": "GND", "4": "GND"},
+     "40MHz 10ppm 3225", lcsc="C255909",
+     note="40 MHz, the top of the three rates the part accepts (4/20/40). "
+          "Classic 500 kbit/s would be happy on 20, but 40 is what CAN FD "
+          "data rates need and the crystals cost the same")
+C(cn, "15pF 50V", "XTAL1", "GND", note="Crystal load cap. Value assumes a "
+  "crystal specified for 8 pF CL and about 5 pF of stray -- check CL on the "
+  "part actually bought, an oscillator that starts on the bench and not at "
+  "-20 C is the classic way to get this wrong")
+C(cn, "15pF 50V", "XTAL2", "GND", note="Crystal load cap")
+
+part(cn, "U", "Interface_CAN_LIN:TJA1051T-3", "TJA1051T/3", SOIC8,
+     {"1": "CAN2_TXD", "2": "GND", "3": "+5V", "4": "CAN2_RXD", "5": "+3V3",
+      "6": "CAN2L_T", "7": "CAN2H_T", "8": "CAN2_S"},
+     "TJA1051T/3,118", lcsc="C58988",
+     note="Second bus transceiver. Same part as U5, so two positions on one "
+          "BOM line")
+C(cn, "100nF 16V", "+5V", "GND", note="U-CAN2 5 V decoupling")
+C(cn, "100nF 16V", "+3V3", "GND", note="U-CAN2 VIO decoupling")
+R(cn, "10k", "CAN2_S", "GND", note="Default to normal (non-silent) mode")
+
+part(cn, "L", "Device:L_Coupled", "51uH", "esp32autosport:L_CommonMode_TDK_ACT45B",
+     {"1": "CAN2H_T", "2": "CAN2_H_C", "3": "CAN2L_T", "4": "CAN2_L_C"},
+     "TDK ACT45B-510-2P-TL003", "Second bus choke, same part as L1",
+     lcsc="C76584")
+part(cn, "JP", "Jumper:SolderJumper_2_Open", "TERM2 (default OFF)", SJ2,
+     {"1": "CAN2_H_C", "2": "TERM2_A"},
+     note="Ships OPEN, for the same reason TERM does: a vehicle bus is "
+          "already terminated at both ends")
+R(cn, "60.4", "TERM2_A", "CAN2_SPLIT", note="Split termination upper half")
+R(cn, "60.4", "CAN2_SPLIT", "CAN2_L_C", note="Split termination lower half")
+C(cn, "4.7nF 50V", "CAN2_SPLIT", "GND", note="Split-termination common-mode stabiliser")
+
+# ---- which one reaches the harness --------------------------------------
+# AUX_A and AUX_B are harness pins 5 and 6. They carry either the K-line or
+# the second CAN pair, never both -- K-line idles at battery voltage and a
+# CAN transceiver biases its bus to 2.5 V, so the two cannot share a wire.
+#
+# The clamps sit at the connector, AHEAD of the jumpers, so the protection is
+# the same whichever way they are set. That is also why the K-line lost its
+# own SMAJ26CA: this one already covers it, and 26 V bidirectional is the
+# right standoff for both jobs.
+part(cn, "D", "Device:D_TVS", "SMAJ26CA", SMA, {"1": "AUX_A", "2": "GND"},
+     "Diodes Inc SMAJ26CA-13-F", "Aux port clamp, either mode", lcsc="C134976")
+part(cn, "D", "Device:D_TVS", "SMAJ26CA", SMA, {"1": "AUX_B", "2": "GND"},
+     "Diodes Inc SMAJ26CA-13-F", "Aux port clamp, either mode", lcsc="C134976")
+part(cn, "JP", "Jumper:SolderJumper_3_Bridged12", "AUXSEL (default K-line)", SJ3B12,
+     {"2": "AUX_A", "1": "K_LINE", "3": "CAN2_H_C"},
+     note="Ships BRIDGED 1-2 = K-line on harness pin 5, which is what an "
+          "R53 wants. For the second CAN instead: cut 1-2, bridge 2-3, and "
+          "close AUXCL below. Both, or neither, is a bus that does not work")
+part(cn, "JP", "Jumper:SolderJumper_2_Open", "AUXCL (default OFF)", SJ2,
+     {"1": "AUX_B", "2": "CAN2_L_C"},
+     note="The second half of AUXSEL. Open in K-line mode, which also leaves "
+          "the second transceiver looking at an open circuit -- harmless, "
+          "but firmware must not enable CAN2 there or it will bus-off "
+          "waiting for an ACK that cannot come")
+part(cn, "TP", "Connector:TestPoint", "AUX_A", TP, {"1": "AUX_A"})
+
+
 # -------------------------------------------------------------- analog ----
 an = sheet("Analog Inputs", "analog.kicad_sch",
            "4 sensor channels, jumper-selected dividers, differential return")
@@ -1102,14 +1219,17 @@ an = sheet("Analog Inputs", "analog.kicad_sch",
 # comes back as a Kelvin sense wire, through an IDENTICAL attenuator, and the
 # ADS1115 subtracts the two:
 #
-#     AINn      = (Vsig + Voff) * 15/26
-#     AGND_SENSE= (       Voff) * 15/26
-#     AINn - AGND_SENSE = Vsig * 15/26        <- Voff gone, exactly
+#     AINn      = (Vsig + Voff) * 2.21/13.21
+#     AGND_SENSE= (       Voff) * 2.21/13.21
+#     AINn - AGND_SENSE = Vsig * 2.21/13.21   <- Voff gone, exactly
 #
 # SENS_RTN is a sense wire and carries ~12 uA; GND on the connector is the
 # excitation return and carries the sensors' 80 mA. They are separate pins on
 # purpose -- if they shared one, that wire's own IR drop would be the offset
 # we are trying to remove.
+#
+# There is one divider ratio on this board, and that is what makes the
+# subtraction exact -- see the note above the channel loop.
 #
 # The ESP32's own ADC path stays single-ended. It is the fast-and-rough
 # channel at +/-1-2 % anyway, so a ground offset is not what limits it.
@@ -1124,6 +1244,26 @@ part(an, "J", "Connector_Generic:Conn_01x10", "Sensor harness", JST10,
      "carrying grounds, four signals. SENS_RTN must land on the SENSOR's "
      "ground stud, not on the same stud as pins 9/10", lcsc="C157966")
 
+# ONE RANGE, NOT THREE.
+#
+# The channels used to carry three solder jumpers each: a 0-3.3 V bypass, a
+# 0-5 V / 0-16 V range select, and a pull-up bias. Only 5 V and 12 V sensors
+# are actually wanted, and both fit inside the 0-16 V divider, so the range
+# select and the bypass are gone -- twelve jumpers and four resistors.
+#
+# The resolution argument for a narrower range died with the second ADS1115.
+# A 5 V sensor through the 0-16 V divider lands at 0.836 V, which on a 16-bit
+# part at +/-4.096 V is 6688 counts and 0.75 mV referred to the input. Even
+# the ESP32's own 12-bit ADC still gets 1104 counts out of it.
+#
+# The real reason is the differential ground, and it is not a nicety. A
+# channel switched to 0-16 V while the return attenuator stayed at the 0-5 V
+# ratio subtracts 0.5769*Voff from a signal scaled by 0.1673 -- so a 300 mV
+# chassis offset arrives as 735 mV of error, worse than not correcting at
+# all. A per-channel range select would need a per-channel matched return
+# attenuator and a jumper that switches both together, and a jumper you can
+# half-set is a silent wrong reading. One fixed ratio makes the match
+# structural instead of a thing to remember.
 for n in range(1, 5):
     inp, node, out = "AIN%d_IN" % n, "AIN%d_A" % n, "AIN%d" % n
     # Transient clamp at the connector, ahead of everything else. The BAT54S
@@ -1140,28 +1280,18 @@ for n in range(1, 5):
            "the divider chain, so its tolerance is a gain error" % n)
     part(an, "JP", "Jumper:SolderJumper_2_Open", "PULLUP%d" % n, SJ2,
          {"1": "+5VS", "2": "AIN%d_PU" % n},
-         note="Close for 2-wire NTC / open-collector sensors")
+         note="Close for 2-wire NTC / open-collector sensors. Nothing to do "
+              "with the input range -- it is about what kind of sensor is on "
+              "the other end, not how many volts it swings")
     R(an, "2.49k", "AIN%d_PU" % n, node, note="Ch%d bias resistor" % n)
     R(an, "10k 0.1%", node, out,
       note="Ch%d divider upper leg, 0.1%% thin film for AFR-grade accuracy" % n)
-    part(an, "JP", "Jumper:SolderJumper_2_Open", "BYPASS%d" % n, SJ2,
-         {"1": node, "2": out},
-         note="Close for a raw 0-3.3V sensor (shorts the upper leg)")
-    part(an, "JP", "Jumper:SolderJumper_3_Bridged12", "RANGE%d (default 0-5V)" % n, SJ3B12,
-         {"2": out, "1": "AIN%d_R1" % n, "3": "AIN%d_R2" % n},
-         note="Ships BRIDGED 1-2 = the 0-5V range, which is what almost every "
-              "automotive sensor is. Cut 1-2 and bridge 2-3 for 0-16V; cut "
-              "1-2 and leave both open for no divider (then close BYPASS%d "
-              "for a raw 0-3.3V sensor). Defaulting to 0-5V also means the "
-              "firmware's DIVIDER_GAIN matches the board as shipped. NOTE: "
-              "moving a channel off the default breaks the match with the "
-              "return attenuator, so that channel loses its ground rejection "
-              "-- read it single-ended if you do" % n)
-    R(an, "15k 0.1%", "AIN%d_R1" % n, "GND",
-      note="0-5V range: 5.0V in -> ~2.88V at the ADC (1k series included); "
-           "exact scale is a firmware calibration constant")
-    R(an, "2.21k 0.1%", "AIN%d_R2" % n, "GND",
-      note="0-16V range: 16.0V in -> ~2.67V at the ADC (1k series included)")
+    R(an, "2.21k 0.1%", out, "GND",
+      note="Ch%d divider lower leg. 2.21/13.21 = 0.1673, so 16.0 V in gives "
+           "2.68 V at the ADC and 5.0 V gives 0.836 V -- both inside the "
+           "3.1 V the ESP32 ADC can actually use. This value must match the "
+           "return attenuator below exactly or the ground correction is "
+           "worse than useless" % n)
     C(an, "100nF 16V", out, "GND", note="Ch%d anti-alias / ADC charge reservoir" % n)
     # One SOT-23 series pair: GND -> signal -> +3V3, so the node is clamped a
     # Schottky drop either side of the rails.
@@ -1180,10 +1310,12 @@ part(an, "D", "Device:D_TVS", "SMAJ40CA", SMA, {"1": "SENS_RTN", "2": "GND"},
      lcsc="C223989")
 R(an, "1k 0.1%", "SENS_RTN", "AGND_A", note="Matches the channels' 1k series")
 R(an, "10k 0.1%", "AGND_A", "AGND_SENSE", note="Matches the channels' upper leg")
-R(an, "15k 0.1%", "AGND_SENSE", "GND",
-  note="Matches the channels' 0-5V lower leg. Also what holds AGND_SENSE at "
-       "0 V when nothing is plugged in, so an absent loom reads as zero "
-       "offset rather than as a floating reference")
+R(an, "2.21k 0.1%", "AGND_SENSE", "GND",
+  note="Matches the channels' lower leg. Same value, same 0.1%% part, same "
+       "reel if possible -- the whole ground correction is the difference of "
+       "two attenuators, so it is only as good as they match. Also what "
+       "holds AGND_SENSE at 0 V when nothing is plugged in, so an absent "
+       "loom reads as zero offset rather than as a floating reference")
 C(an, "100nF 16V", "AGND_SENSE", "GND", note="Matches the channels' filter")
 part(an, "D", "Device:D_Schottky_Dual_Series_AKC", "BAT54S", SOT23,
      {"1": "GND", "3": "AGND_SENSE", "2": "+3V3"}, "MDD BAT54S",

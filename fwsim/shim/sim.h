@@ -46,6 +46,8 @@ enum Role {
   ROLE_SENS_EN,
   ROLE_KLINE_TX,      // ISO 9141 K-line, low-side FET gate
   ROLE_KLINE_RX,      // ISO 9141 K-line, divided and clamped
+  ROLE_CAN2_SPI,      // MCP2518FD: SCK / MOSI / MISO / CS
+  ROLE_CAN2_INT,      // MCP2518FD interrupt
   ROLE_USB,
   ROLE_UART,
   ROLE_SPI,

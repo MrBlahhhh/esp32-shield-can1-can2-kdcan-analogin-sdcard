@@ -96,12 +96,17 @@ def channel(n):
 
     Signal in from the harness on the left, transient clamp straight to
     ground, series resistor, then the optional pull-up for a switch or a
-    two-wire sender. The 10k and its bypass jumper set the gain, the range
-    jumper picks which leg goes to ground, and the filter cap and Schottky
-    clamp sit on the ADC node at the right. Four of these, identical.
+    two-wire sender. The 10k/2.21k divider sets the scale, and the filter
+    cap and Schottky clamp sit on the ADC node at the right. Four of these,
+    identical.
+
+    The bypass and range jumpers that used to sit between the divider and
+    the ADC node are gone with the second and third input ranges -- see the
+    note above the channel loop in gen/generate_schematic.py. The drawing is
+    shorter by two parts and a whole column of wire.
     """
     inn, a, pu = "AIN%d_IN" % n, "AIN%d_A" % n, "AIN%d_PU" % n
-    ain, r1, r2 = "AIN%d" % n, "AIN%d_R1" % n, "AIN%d_R2" % n
+    ain = "AIN%d" % n
     return {
         "sheet": "Analog Inputs",
         "anchor": ("1k", {inn, a}),
@@ -111,39 +116,28 @@ def channel(n):
             ("PULLUP%d" % n, {"+5VS", pu},    7.62, -15.24, 270),
             ("2.49k",      {pu, a},           7.62,  -3.81,   0),
             ("10k",        {a, ain},         26.67,   0.00,  90),
-            # A solder jumper is already horizontal at 0 -- unlike Device:R,
-            # which needs 90 to lie down.
-            ("BYPASS%d" % n, {a, ain},       26.67,   7.62,   0),
-            ("RANGE%d (default 0-5V)" % n, {r1, ain, r2},   40.64,  10.16, 180),
-            ("15k",        {r1, "GND"},      45.72,  19.05,   0),
-            ("2.21k",      {r2, "GND"},      35.56,  19.05,   0),
-            ("100nF",      {ain, "GND"},     55.88,   3.81,   0),
-            ("BAT54S", {"GND", "+3V3", ain}, 50.80, -16.51,   0),
+            # Rotation 0 is VERTICAL for Device:R and Device:C -- 90 lays
+            # them down. Both of these are legs to ground, so they stand up.
+            ("2.21k",      {ain, "GND"},     35.56,   7.62,   0),
+            ("100nF",      {ain, "GND"},     45.72,   7.62,   0),
+            ("BAT54S", {"GND", "+3V3", ain}, 40.64, -16.51,   0),
         ],
         "wires": [
             [(-20.32, 0.00), (-3.81, 0.00)],      # harness in, clamped
             [(3.81, 0.00), (22.86, 0.00)],        # after the series resistor
             [(7.62, -11.43), (7.62, -7.62)],      # pull-up jumper to its R
-            [(22.86, 0.00), (22.86, 7.62)],       # bypass jumper, in
-            [(30.48, 0.00), (30.48, 7.62)],       # bypass jumper, out
-            [(30.48, 0.00), (55.88, 0.00)],       # the ADC node
-            [(40.64, 6.35), (40.64, 0.00)],       # range jumper common
-            [(45.72, 10.16), (45.72, 15.24)],     # range leg 1
-            [(35.56, 10.16), (35.56, 15.24)],     # range leg 2
-            [(50.80, -11.43), (50.80, 0.00)],     # clamp
+            [(30.48, 0.00), (45.72, 0.00)],       # the ADC node
+            [(35.56, 0.00), (35.56, 3.81)],       # divider lower leg
+            [(45.72, 0.00), (45.72, 3.81)],       # filter cap
+            [(40.64, -11.43), (40.64, 0.00)],     # clamp
         ],
         "junctions": [(-12.70, 0.00), (7.62, 0.00),
-                      (40.64, 0.00), (50.80, 0.00)],
-        # Every name sits on a stretch of wire nothing else is using: the
-        # jumpers carry long values (RANGE3, BYPASS3) that sprawl either side
-        # of the part, so the legs are drawn long enough to label below them.
+                      (35.56, 0.00), (40.64, 0.00), (45.72, 0.00)],
         "labels": {
             inn: (-20.32, 0.00, 0),
             a: (16.51, 0.00, 0),
             pu: (7.62, -9.53, 0),
-            ain: (33.02, 0.00, 0),
-            r1: (45.72, 15.24, 0),
-            r2: (35.56, 15.24, 0),
+            ain: (31.75, 0.00, 0),
         },
     }
 
@@ -426,12 +420,14 @@ SDCARD = {
         ("10k",      {"SD_VDD", "SD_D1_C"},     -92.71, -35.56,  90),
         ("10k",      {"SD_VDD", "SD_D2_C"},     -92.71, -27.94,  90),
         ("10k",      {"SD_VDD", "SD_D3_C"},     -92.71, -20.32,  90),
-        ("33",       {"SD_D2", "SD_D2_C"},      -64.77, -25.40,  90),
-        ("33",       {"SD_D3", "SD_D3_C"},      -64.77, -17.78,  90),
+        # Only the three lines that still reach the MCU get a damping
+        # resistor. D1/D2/D3 stop at the card in 1-bit mode -- they keep
+        # their pull-ups above, because a card samples DAT3 at power-up and
+        # falls into SPI mode if it finds it low, but there is no transmission
+        # line left to damp.
         ("33",       {"SD_CMD", "SD_CMD_C"},    -64.77, -10.16,  90),
         ("33",       {"SD_CLK", "SD_CLK_C"},    -64.77,  -2.54,  90),
         ("33",       {"SD_D0", "SD_D0_C"},      -64.77,   5.08,  90),
-        ("33",       {"SD_D1", "SD_D1_C"},      -64.77,  12.70,  90),
         ("47k",      {"+3V3", "SD_CD"},         -64.77,  25.40,   0),
     ],
     "wires": [
