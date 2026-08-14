@@ -202,10 +202,12 @@ def main():
         # the wrong value.
         want_n = number(want_v)
         if want_n is not None and looks_like_value(want_v):
-            # Some lines lead with the power rating instead -- "125mW
-            # 2.21kOhm 150V Thin Film". Skip a leading mW/W token before
-            # reading the value, or a 2.21k part reads as 0.125.
-            d2 = re.sub(r"^\s*[\d.]+\s*m?W\s*", "", desc)
+            # ...except when it does not. Some lines lead with the power
+            # rating -- "125mW 2.21kOhm 150V Thin Film" -- and some with the
+            # voltage -- "100V 100nF X7R +/-10% 0805". Skip any run of
+            # leading rating tokens before reading the value, or the 2.21k
+            # part reads as 0.125 and the 100nF reads as 100.
+            d2 = re.sub(r"^\s*(?:[\d.]+\s*(?:m?W|V)\s+)+", "", desc)
             lead = re.match(r"\s*(\d+(?:\.\d+)?)\s*([pnumkKM]?)", d2)
             got_n = None
             if lead:

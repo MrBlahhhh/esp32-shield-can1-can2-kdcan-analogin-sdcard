@@ -11,82 +11,81 @@ number and this file does not. --moq restores the old
 guessed rounding, which got several parts wrong.
 
   part       order  needed  logger    gate  comment
-  C149504       65      65      40      25 * 100k
-  C17414        55      55      50       5 * 10k
-  C17513        55      55      35      20 * 1k
+  C149504      100      65      40      25 * 100k
+  C17414       100      55      50       5 * 10k
+  C17513       100      55      35      20 * 1k
   C12891        20      20      10      10 * 22uF 16V
   C13585        20      20      15       5 * 10uF 16V
-  C29055        15      15       5      10 * 100nF 100V
-  C2480         10      10       5       5 * SS14
+  C28233        50      15       5      10 * 100nF 100V
+  C2480         50      10       5       5 * SS14
   C17313        10      10       5       5 * MF-MSMF050-2
-  C49678        35      35       0      35   100nF 50V
-  C408389       35      35      35       0   BAT54S
-  C13967        25      25      25       0   470nF 50V
+  C49678        40      35       0      35   100nF 50V
+  C408389       50      35      35       0   BAT54S
+  C13967        40      25      25       0   470nF 50V
   C134976       25      25      25       0   SMAJ26CA-13-F
   C223989       25      25      25       0   SMAJ40CA
-  C856630       25      25      25       0   10k 0.1%
-  C865368       25      25      25       0   2.21k 0.1%
-  C17634        20      20      20       0   33
-  C72998        20      20      20       0   60.4
-  C2930178      20      20      20       0   2.49k
-  C113952       15      15       0      15   SMAJ5.0A
-  C17557        15      15       0      15   220
-  C17520        15      15       0      15   2.2k
-  C1744         10      10      10       0   4.7nF 50V
-  C1794         10      10      10       0   15pF 50V
+  C5159707      50      25      25       0   10k 0.1%
+  C865368       40      25      25       0   2.21k 0.1%
+  C17634       100      20      20       0   33
+  C72998       100      20      20       0   60.4
+  C2930178     100      20      20       0   2.49k
+  C113952       20      15       0      15   SMAJ5.0A
+  C17557       100      15       0      15   220
+  C17520       100      15       0      15   2.2k
+  C1744         50      10      10       0   4.7nF 50V
+  C107110      100      10      10       0   15pF 50V
   C76584        10      10      10       0   ACT45B-510-2P-TL003
   C719178       10      10      10       0   MF-MSMF020/60-2
-  C8545         10      10      10       0   2N7002
-  C17673        10      10      10       0   4.7k
+  C8545         50      10      10       0   2N7002
+  C17673       100      10      10       0   4.7k
   C13612        10      10      10       0   SRV05-4.TCT
   C58988        10      10      10       0   TJA1051T/3,118
   C37593        10      10      10       0   ADS1115IDGSR
-  C107146       10      10       0      10   2.2nF 50V
-  C81598        10      10       0      10   1N4148W
-  C84261        10      10       0      10   XL-2012UYC
+  C107146      100      10       0      10   2.2nF 50V
+  C81598        50      10       0      10   1N4148W
+  C84261        20      10       0      10   XL-2012UYC
   C20917        10      10       0      10   AO3400A
-  C2930156      10      10       0      10   31.6k
-  C28323         5       5       5       0   1uF 16V
-  C46653         5       5       5       0   1nF 50V
+  C2930156     100      10       0      10   31.6k
+  C28323        10       5       5       0   1uF 16V
+  C46653        20       5       5       0   1nF 50V
   C223993        5       5       5       0   SMAJ6.0A
-  C2297          5       5       0       5   XL-2012UGC
-  C81034         5       5       5       0   742792022
+  C2297         50       5       0       5   XL-2012UGC
+  C81034        10       5       5       0   742792022
   C719027        5       5       5       0   DM3D-SF
-  C7472914       5       5       5       0   DMG2301L
-  C17408         5       5       5       0   100
-  C17713         5       5       5       0   47k
-  C17901         5       5       5       0   100
-  C17955         5       5       5       0   20
-  C17560         5       5       5       0   22k
-  C17985         5       5       5       0   750
-  C17695         5       5       5       0   43k 1%
-  C17506         5       5       5       0   18k 1%
-  C17828         5       5       5       0   8.2k
-  C17514         5       5       5       0   1M
+  C7472914      10       5       5       0   DMG2301L
+  C17408       100       5       5       0   100
+  C17713       100       5       5       0   47k
+  C17901       100       5       5       0   100
+  C17955        50       5       5       0   20
+  C17560       100       5       5       0   22k
+  C17985       100       5       5       0   750
+  C17695       100       5       5       0   43k 1%
+  C17506       100       5       5       0   18k 1%
+  C17828       100       5       5       0   8.2k
+  C17514       100       5       5       0   1M
   C127592        5       5       5       0   TLV431ASN1T1G
   C7484          5       5       5       0   SN74AHCT1G125DBVR
   C626759        5       5       5       0   MCP2518FDT-H/SL
-  C5186937       5       5       5       0   TX322540M4FBCE2T
+  C5186937      10       5       5       0   TX322540M4FBCE2T
   C387601        5       5       0       5   10uF 100V
-  C113967        5       5       0       5   SMAJ36A
-  C8678          5       5       0       5   SS34
+  C113967       20       5       0       5   SMAJ36A
+  C8678         20       5       0       5   SS34
   C168133        5       5       0       5   FNR8040S330MT
-  C17438         5       5       0       5   121k
-  C17936         5       5       0       5   4.7k
+  C17438       100       5       0       5   121k
+  C17936        50       5       0       5   4.7k
   C477928        5       5       0       5   LM5164DDAR
 
-  63 distinct parts, 830 pieces
+  63 distinct parts, 3160 pieces
   * = on both boards (8 parts)
 
-  Ordering the two projects separately would take 830 pieces.
-  Combining saves 0 pieces of minimum-order padding.
+  Ordering the two projects separately would take 3610 pieces.
+  Combining saves 450 pieces of minimum-order padding.
 
 Consolidated -- same value and package, two part numbers
 ----------------------------------------------------------
   Each pair below was ordered as ONE line. Equivalent by
   what the two designs say about them; check before you
   order, because a pair can also mean one is just wrong.
-    100nF 100V     C_0805                  use C29055    not C28233
     22uF 16V       C_1206                  use C12891    not C45783
     MF-MSMF050-2   R_1812_4532Metric       use C17313    not C79666
     100k           R_0805                  use C149504   not C17407

@@ -144,24 +144,100 @@ wrong: `1N4148W` parsed as the value "1" against a description leading with
 "150 mA", and the Würth bead's MPN `742792022` parsed as 742 megohms. Values
 that are really part numbers are now skipped rather than compared.
 
-### The substitution that made this necessary twice
+### When to substitute for a part that is not in the index
 
-`check_stock.py` used to replace any part it could not find in the index. The
-index is JLCPCB's **assembly** library, which is a subset of what LCSC sells,
-so a miss there means "cannot be machine-placed", not "cannot be bought" —
-`C37593`, the ADS1115, is absent from it and was sitting in a real LCSC cart
-at the same moment. Substituting on a miss put `C28233`, a **16 V** capacitor,
-into a 100 V position on the 24 V input rail. Valid number, right value,
-right package, no voltage in its catalogue line to compare against.
+An earlier version of this page said `C28233` was a 16 V capacitor that
+`check_stock.py` had wrongly dropped into a 100 V position. **That was wrong.**
+`C28233` is a 100 V 100 nF X7R 0805 and the substitution was correct. The
+index holds two records for it — one keyed by part number and one by MPN —
+and the by-number record comes back with an empty description, so the
+Samsung code `CL21B104K`**`C`**`FNNNE` was decoded by hand and read as 16 V.
+The cart export settles it: `A` is 25 V and `B` is 50 V across four other
+Samsung lines on this board, and `C` is 100 V.
 
-Unlisted parts now stay in the paste file unchanged, and any substitute that
-*is* made must state a voltage at or above the design's — silence is not
-evidence of a 100 V part.
+The real question is narrower. Absence from the index means one of two
+things, because the index is JLCPCB's **assembly** library:
+
+- `C37593`, the ADS1115, is absent from it and was sitting in a real LCSC
+  cart at the same moment — it cannot be machine-placed, but it can be bought.
+- `C29055` and `C1794` were absent and LCSC rejected both, one "not found"
+  and one "not available".
+
+Two out of three, so absence is a real signal, and refusing to act on it is
+not the safe choice it looks like — a round of this project shipped a cart
+with two unbuyable lines in it for exactly that reason.
+
+What separates the cases is not the index, it is what the schematic asked
+for. A jellybean is specified by **value** — "100 nF 100 V", "15 pF 50 V" —
+and anything meeting that value will do, so swapping is free. A part
+specified by **manufacturer part number** — "ADS1115IDGSR", "1N4148W" — was
+chosen for reasons the tool cannot see, and the nearest match by description
+is a different component. So it substitutes jellybeans and never an MPN.
+
+Any substitute it does make must state a tolerance and a voltage at or above
+the design's. Silence is not evidence of a 100 V part.
+
+### Both dead parts are fixed at source, not at order time
+
+`C29055` and `C1794` are gone from the generators. The 100 V decoupler is
+`C28233` and the crystal load caps are `C107110`, an NP0 part, which matters
+for a 40 MHz crystal in a way X7R would not have been.
+
+The 100 nF was interesting for a second reason: the logger already said
+`C28233` and only the gate project said `C29055`. The combined order picks
+one number when the two projects disagree, and it picked by **quantity used**
+— the gate uses ten and the logger five, so the one dead number in the pair
+beat the live one. It now prefers whichever number has come back in a cart
+export, and falls back to quantity only between two equally unknown ones.
+
+## Minimum order quantities: the cart export is the only source
+
+MOQs cannot be derived. Across 78 real parts they take seven distinct values
+— 1, 2, 5, 10, 20, 50, 100 — and two 0805 resistors from the same
+manufacturer in the same series can differ. An early version of this project
+guessed them from the package and got **45 of 70 wrong**.
+
+There is also no API for them. LCSC's own is behind Akamai, EasyEDA's mirror
+answers 403 from CloudFront, JLCPCB's cart endpoint 404s, and the parts index
+that does answer carries stock and price but not MOQ.
+
+The reaction to that was to stop rounding altogether and let LCSC bump each
+line at checkout. That is worse than it sounds, and it is what produced the
+complaint that the minimums were "way off": **42 of 69 lines in the paste
+file disagreed with what ended up in the cart.** The file said 5 and the cart
+said 100, silently, forty-two times. A file that does not say what you are
+buying is not much of an order.
+
+What does carry the real numbers, exactly and for free, is a cart export:
+
+```
+python gen/learn_moq.py <cart-export.csv> [more.csv ...]
+```
+
+That folds `LCSC#`, `MOQ` and `Multiple` into `fab/lcsc-moq.csv`, which only
+grows. Rounding is on by default now and `moq_round` leaves any part not in
+that table exactly alone, so there is no guessing left in it — the choice is
+"round the lines we have real numbers for", which has no downside. All 69
+lines of the current order now conform, and the paste file matches the cart
+line for line.
+
+The ledger is also the best available evidence that a part number is real —
+better than the parts index, which both misses parts LCSC sells and lists
+parts it no longer does. The combined order uses it to break ties.
+
+**So the loop is: paste, export, `learn_moq.py`, and the next order is
+quantised correctly.** Each round trip through the cart permanently improves
+the data, which is the closest thing to an API that exists here.
 
 ## Before you order
 
 1. Re-check stock. These were read on 2026-08-12 and stock moves.
    `python gen/check_stock.py`, then `python gen/verify_cart.py --live`.
+   Both should report nothing: no short lines, no unlisted lines, and every
+   line matching the value, package, tolerance and voltage asked for.
+2. After the cart exists, `python gen/learn_moq.py <export.csv>` and
+   `python gen/verify_cart.py <export.csv>` — the first keeps the minimums
+   current, the second checks what LCSC actually put in the basket.
 2. Confirm the DevKitC-1 header row pitch against Espressif's DXF. It is the
    one dimension that decides whether the board is usable at all.
 3. The two supercapacitors are the only line where the exact part matters

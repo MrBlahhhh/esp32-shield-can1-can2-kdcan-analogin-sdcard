@@ -33,7 +33,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 
-from export_order import moq_round  # noqa: E402  same rules, one definition
+from export_order import MOQ_REAL, moq_round  # noqa: E402  one definition
+
+# Every part number that has come back in an LCSC cart export. Appearing
+# there is the strongest evidence available that a number is real and
+# orderable -- stronger than the parts index, which is JLCPCB's assembly
+# library and both misses parts LCSC sells and lists parts it no longer does.
+KNOWN_GOOD = set(MOQ_REAL)
 
 # The other project. Not a sibling directory by any rule, so it is named
 # rather than guessed, and --other overrides it.
@@ -76,9 +82,14 @@ def main():
     ap.add_argument("--boards", type=int, default=5,
                     help="how many of EACH board (default 5)")
     ap.add_argument("--other", default=OTHER_DEFAULT)
-    ap.add_argument("--moq", action="store_true",
-                    help="pre-round to a GUESSED minimum order quantity "
-                         "(off by default -- see the note below)")
+    # Rounding is ON now, and it is no longer a guess. fab/lcsc-moq.csv holds
+    # real minimums read out of LCSC cart exports by gen/learn_moq.py, and
+    # moq_round leaves any part that is not in that table exactly alone. So
+    # the choice is no longer "guess or do not round" but "round the lines we
+    # have real numbers for", which has no downside.
+    ap.add_argument("--no-moq", dest="moq", action="store_false",
+                    default=True,
+                    help="do not round to the known minimum order quantities")
     args = ap.parse_args()
     n = args.boards
 
@@ -105,7 +116,14 @@ def main():
     parts = {}
     for (c, f), pns in groups.items():
         if len(pns) > 1:
-            keep = max(pns, key=lambda p: pns[p]["a"] + pns[p]["b"])
+            # Prefer the number LCSC has actually confirmed, and only fall
+            # back to "whichever is used more" between two equally unknown
+            # ones. Quantity alone picked C29055 over C28233 for the 100V
+            # decoupler -- more of the board used it, and it is discontinued,
+            # so the one dead number in the pair beat the live one and the
+            # whole line came back rejected.
+            keep = max(pns, key=lambda p: (p in KNOWN_GOOD,
+                                           pns[p]["a"] + pns[p]["b"]))
             for p in pns:
                 if p != keep:
                     substitutions.append((c, f, p, keep))

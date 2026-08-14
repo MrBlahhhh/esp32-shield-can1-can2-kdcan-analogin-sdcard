@@ -518,7 +518,7 @@ GENERIC_LCSC = {
     # Verified against JLCPCB's basic-parts list, 2026-08-12. Package is part
     # of the key -- see generic_lcsc() for why that is not optional.
     ("100", "1206"): "C17901",      # 1/4 W, the supercap charge resistor
-    ("15pF50V", "0805"): "C1794",
+    ("15pF50V", "0805"): "C107110",  # NP0. C1794 is dead at LCSC
     ("470nF50V", "0805"): "C13967",  # CL21B474KBFNNNE, X7R
     ("18k1%", "0805"): "C17506",
     ("20", "1206"): "C17955",       # 1/4 W, K-line series
@@ -532,7 +532,7 @@ GENERIC_LCSC = {
     ("100nF100V", "0805"): "C28233",
     ("100nF16V", "0805"): "C49678",
     ("10k", "0805"): "C17414",
-    ("10k0.1%", "0805"): "C856630",
+    ("10k0.1%", "0805"): "C5159707",  # C856630 is down to 11 in stock
     ("10nF100V", "0805"): "C128805",
     ("10uF100V", "1206"): "C6872041",
     ("10uF16V", "1206"): "C13585",

@@ -1,29 +1,9 @@
 Stock check -- order-combined.csv
 ==============================================================
 
-  in stock for the quantity needed : 60
-  short                            : 1
-  not in the index                 : 2
-
-SHORT -- cannot cover the order
---------------------------------------------------------------
-  C856630   need 25     stock 11        10k 0.1%
-        -> C5159707  FRH0805B1002TS         stock 456538          $0.0147
-        -> C110775   RT0805BRD0710KL        stock 389606          $0.0389
-        -> C406725   ARG05BTC1002           stock 145905          $0.0288
-
-NOT IN THE INDEX -- check on LCSC directly
---------------------------------------------------------------
-  Absent from JLCPCB's assembly library is not the same
-  as unbuyable; most of these are stocked at LCSC. The
-  ADS1115 below is absent from it and was sitting in a
-  real LCSC cart at the same time.
-
-  These stay in the paste file UNCHANGED. Paste it, and
-  if LCSC rejects one of these lines, that is the answer
-  -- come back and pick a replacement then.
-  C29055    need 15     100nF 100V
-  C1794     need 10     15pF 50V
+  in stock for the quantity needed : 63
+  short                            : 0
+  not in the index                 : 0
 
 Substitutions above are SUGGESTIONS. Check tolerance and
 voltage before taking one: a 5%% part is a fine pull-up and
@@ -38,10 +18,3 @@ Through-hole lines, also checked
   C35449    x10    SRD-05VDC-SL-C             stock 36723
   C474881   x20    KF301-5.0-2P               stock 173497
   C474882   x10    KF301-5.0-3P               stock 37218
-
-SWAPPED in fab/order-verified-paste.txt
---------------------------------------------------------------
-  C856630   -> C5159707  10k 0.1%        11 -> 456538 in stock
-
-  That file is the one to paste. It is the same order
-  with these lines replaced by something buyable.

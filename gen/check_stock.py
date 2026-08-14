@@ -77,6 +77,26 @@ def query(term, tries=3):
     return []
 
 
+def looks_like_mpn(comment):
+    """Is this Comment a manufacturer part number rather than a value?
+
+    'ADS1115IDGSR' and '1N4148W' are; '100nF 100V' and '4.7k' are not. The
+    test is a letter adjacent to a digit inside one token, which no plain
+    value has once its unit suffix is discounted, plus a bare-letters case
+    for things like 'SS34' and 'LTV-814'."""
+    for token in (comment or "").split():
+        t = token.strip("(),")
+        if not t:
+            continue
+        # 100nF, 4.7k, 2.2nF, 470nF, 15pF, 60.4, 33uH -- value plus unit.
+        if re.fullmatch(r"[\d.]+\s*[pnumkKMRrTt]?[FHVW%]?", t):
+            continue
+        if re.fullmatch(r"±?[\d.]+%", t) or re.fullmatch(r"[\d.]+V", t):
+            continue
+        return True
+    return False
+
+
 def find(pn, comment, footprint):
     """Locate one part number. Searching by C-number works for most of the
     index and silently returns nothing for some of it, so fall back to the
@@ -232,22 +252,36 @@ def main():
                           str(stock), str(best.get("stock"))))
         else:
             cart.append((pn, need))
-    # "Not in the index" is NOT a reason to substitute. This index carries
-    # JLCPCB's assembly library, which is a subset of what LCSC sells, so a
-    # miss here means "cannot be machine-placed", not "cannot be bought" --
-    # the ADS1115, C37593, is absent from it and sat in a real LCSC cart at
-    # the same time.
+    # Absence from the index means one of two very different things, and the
+    # difference decides whether substituting is right.
     #
-    # Swapping on a miss actively did harm. The 100nF 100V input cap, absent
-    # for the same reason, was replaced with C28233, a 16V part, on a 24V
-    # rail. Nothing downstream would have caught it: the number is valid,
-    # the package is right, the value is right, and the catalogue line for
-    # it carries no voltage to compare against.
+    # This index is JLCPCB's assembly library, a subset of what LCSC sells,
+    # so a miss can mean "cannot be machine-placed" rather than "cannot be
+    # bought": C37593, the ADS1115, is absent from it and sat in a real LCSC
+    # cart at the same time. But a miss can also be simply correct -- C29055
+    # and C1794 were both absent, and LCSC rejected both, one "not found" and
+    # one "not available".
     #
-    # So keep the original and say it needs a look. An unverified line the
-    # user checks beats a wrong line the tool was confident about.
+    # Two out of three, so absence is a real signal and refusing to act on it
+    # is not the safe choice it looks like: keeping those two put a cart in
+    # front of the user with two lines that could not be bought.
+    #
+    # What separates the cases is not the index, it is what the design asked
+    # for. A jellybean is specified by value -- "100nF 100V", "15pF 50V" --
+    # and any part meeting that value is as good as any other, so swapping is
+    # free. A part specified by manufacturer part number -- "ADS1115IDGSR",
+    # "1N4148W" -- was chosen for reasons this tool cannot see, and the
+    # nearest match by description is a different component.
+    #
+    # So: substitute jellybeans, never substitute an MPN.
     for pn, need, r in unknown:
-        cart.append((pn, need))
+        best = (fixes.get(pn) or [None])[0]
+        if best and not looks_like_mpn(r["Comment"]):
+            cart.append(("C%s" % best["lcsc"], need))
+            swaps.append((pn, "C%s" % best["lcsc"], r["Comment"],
+                          "unlisted", str(best.get("stock"))))
+        else:
+            cart.append((pn, need))
 
     # The combined paste file carries seven through-hole lines that are not
     # in the assembly CSV -- relays, terminals, the optocoupler, the JST
