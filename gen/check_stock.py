@@ -152,10 +152,24 @@ def main():
         # and the first thing this tool ever suggested for it was a 1% part,
         # which would have quietly changed a measurement.
         tol = re.search(r"(\d+(?:\.\d+)?)\s*%", r["Comment"] or "")
+        # Same for voltage, and this one is worse, because a cap that is
+        # right in every other respect and short of volts fails in service
+        # rather than on the bench. A candidate that does not STATE a rating
+        # at or above the design's is not accepted -- silence is not
+        # evidence of a 100V part.
+        vm = re.search(r"(\d+)V\b", r["Comment"] or "")
+
+        def volts_ok(c, want=vm):
+            if not want:
+                return True
+            m = re.search(r"(\d+)V\b", (c.get("description") or ""))
+            return bool(m) and int(m.group(1)) >= int(want.group(1))
+
         cands = [c for c in query(term)
                  if (c.get("stock") or 0) >= need
                  and "C%s" % c.get("lcsc") != pn
                  and (not pkg or str(c.get("package") or "").startswith(pkg))
+                 and volts_ok(c)
                  and (not tol
                       or tol.group(0).replace(" ", "")
                       in ((c.get("description") or "") + (c.get("mfr") or ""))
@@ -191,7 +205,13 @@ def main():
         lines.append("NOT IN THE INDEX -- check on LCSC directly")
         lines.append("-" * 62)
         lines.append("  Absent from JLCPCB's assembly library is not the same")
-        lines.append("  as unbuyable; most of these are stocked at LCSC.")
+        lines.append("  as unbuyable; most of these are stocked at LCSC. The")
+        lines.append("  ADS1115 below is absent from it and was sitting in a")
+        lines.append("  real LCSC cart at the same time.")
+        lines.append("")
+        lines.append("  These stay in the paste file UNCHANGED. Paste it, and")
+        lines.append("  if LCSC rejects one of these lines, that is the answer")
+        lines.append("  -- come back and pick a replacement then.")
         for pn, need, r in unknown:
             lines.append("  %-9s need %-6d %s" % (pn, need, r["Comment"]))
         lines.append("")
@@ -212,14 +232,22 @@ def main():
                           str(stock), str(best.get("stock"))))
         else:
             cart.append((pn, need))
+    # "Not in the index" is NOT a reason to substitute. This index carries
+    # JLCPCB's assembly library, which is a subset of what LCSC sells, so a
+    # miss here means "cannot be machine-placed", not "cannot be bought" --
+    # the ADS1115, C37593, is absent from it and sat in a real LCSC cart at
+    # the same time.
+    #
+    # Swapping on a miss actively did harm. The 100nF 100V input cap, absent
+    # for the same reason, was replaced with C28233, a 16V part, on a 24V
+    # rail. Nothing downstream would have caught it: the number is valid,
+    # the package is right, the value is right, and the catalogue line for
+    # it carries no voltage to compare against.
+    #
+    # So keep the original and say it needs a look. An unverified line the
+    # user checks beats a wrong line the tool was confident about.
     for pn, need, r in unknown:
-        best = (fixes.get(pn) or [None])[0]
-        if best:
-            cart.append(("C%s" % best["lcsc"], need))
-            swaps.append((pn, "C%s" % best["lcsc"], r["Comment"],
-                          "unknown", str(best.get("stock"))))
-        else:
-            cart.append((pn, need))
+        cart.append((pn, need))
 
     # The combined paste file carries seven through-hole lines that are not
     # in the assembly CSV -- relays, terminals, the optocoupler, the JST

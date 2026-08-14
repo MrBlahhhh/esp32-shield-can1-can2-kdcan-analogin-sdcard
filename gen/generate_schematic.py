@@ -563,7 +563,7 @@ GENERIC_LCSC = {
     ("60.4", "0805"): "C72998",
     # Was C2661452, which LCSC does not recognise. SBH2012S600RSP
     # is a 600R/0805 bead, which is what the schematic asks for.
-    ("742792022", "0805"): "C216149",
+    ("742792022", "0805"): "C81034",
     ("742792625", "1206"): "C1533835",
     ("8.2k", "0805"): "C17828",
     ("95.3k", "0805"): "C2930435",

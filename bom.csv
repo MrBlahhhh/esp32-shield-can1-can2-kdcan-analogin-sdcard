@@ -15,7 +15,7 @@ Qty (1 board),Qty (10 boards),References,Value,Voltage,Tolerance,Footprint,Manuf
 1,10,D3,SMAJ6.0A,,,Diode_SMD:D_SMA,Littelfuse SMAJ6.0A,C223993,"Clamps harness-injected transients on the sensor 5V. 6.0V standoff, not 5.0V: a 5.0V part on a 5.0V rail leaks up to 800uA continuously"
 1,10,D4,green,,,LED_SMD:LED_0805_2012Metric,,C2297,"Shield 3V3 is up, which means the dev board is in its socket the right way round and its LDO is running"
 7,70,D11 D13 D15 D17 D19 D20 D7,BAT54S,,,Package_TO_SOT_SMD:SOT-23,MDD BAT54S,C408389,"RX clamp. This one is not optional -- it conducts on every recessive bit above 11.5 V of battery, which is most of them"
-1,10,FB1,600R,,,Inductor_SMD:L_0805_2012Metric,Wurth 742792022,C216149,
+1,10,FB1,600R,,,Inductor_SMD:L_0805_2012Metric,Wurth 742792022,C81034,
 4,40,H1 H2 H3 H4,M3,,,MountingHole:MountingHole_3.2mm_M3,,,
 1,10,J1,CAN1 + power harness,,,Connector_JST:JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical,JST B4B-PH-K-S(LF)(SN),C131334,"OBD-II pins 16/4/6/14. Pin 1 is sense only -- the board is powered from the dev board's USB-C, not from here"
 1,10,J10,Spare diff in,,,Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical,,,"The second ADC's unused pair, brought out raw -- 0-3.3V only, no divider and no clamp in front of them. For a bench sensor, not for the loom"

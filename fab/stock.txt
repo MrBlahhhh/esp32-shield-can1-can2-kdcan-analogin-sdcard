@@ -1,7 +1,7 @@
 Stock check -- order-combined.csv
 ==============================================================
 
-  in stock for the quantity needed : 61
+  in stock for the quantity needed : 60
   short                            : 1
   not in the index                 : 2
 
@@ -15,7 +15,13 @@ SHORT -- cannot cover the order
 NOT IN THE INDEX -- check on LCSC directly
 --------------------------------------------------------------
   Absent from JLCPCB's assembly library is not the same
-  as unbuyable; most of these are stocked at LCSC.
+  as unbuyable; most of these are stocked at LCSC. The
+  ADS1115 below is absent from it and was sitting in a
+  real LCSC cart at the same time.
+
+  These stay in the paste file UNCHANGED. Paste it, and
+  if LCSC rejects one of these lines, that is the answer
+  -- come back and pick a replacement then.
   C29055    need 15     100nF 100V
   C1794     need 10     15pF 50V
 
@@ -36,8 +42,6 @@ Through-hole lines, also checked
 SWAPPED in fab/order-verified-paste.txt
 --------------------------------------------------------------
   C856630   -> C5159707  10k 0.1%        11 -> 456538 in stock
-  C29055    -> C28233    100nF 100V      unknown -> 243637 in stock
-  C1794     -> C107110   15pF 50V        unknown -> 267085 in stock
 
   That file is the one to paste. It is the same order
   with these lines replaced by something buyable.

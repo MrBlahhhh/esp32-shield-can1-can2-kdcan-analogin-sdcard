@@ -99,9 +99,69 @@ The crystal's temperature range is the reason it is that part and not the
 first 40 MHz one found: `C5380316` is also 40 MHz in the same package and is
 rated **−20 to +70 °C**, which a car in a summer car park exceeds.
 
+## The generic table was not as checked as it claimed
+
+The header of this page says every number was opened and read. That was true
+of the parts chosen deliberately. It was **not** true of `GENERIC_LCSC`, the
+lookup that hands out a part number for any plain resistor or capacitor by
+value and package — that table carried a comment saying it had been verified
+against the live catalogue, and it had not been. Nine of its entries were
+wrong, and they were wrong in the way that survives every other check:
+
+| Wanted | Was | What it actually is | Now |
+|---|---|---|---|
+| 2.2 nF 50 V 0805 | `C1547` | 12 pF, and **0402** | `C107146` |
+| 121 kΩ 0805 | `C25089` | 20 Ω, and 0402 | `C17438` |
+| 31.6 kΩ 0805 | `C25100` | 27 Ω, and 0402 | `C2930156` |
+| 4.7 kΩ 1206 | `C17909` | 120 Ω | `C17936` |
+| SMAJ5.0A, SMA | `C908214` | right part, **SOD-123 body** | `C113952` |
+| SMAJ36A, SMA | `C908224` | right part, SOD-123 body | `C113967` |
+| green LED 0805 | `C965798` | 0603 | `C2297` |
+| yellow LED 0805 | `C965800` | 0603 | `C84261` |
+| 600 Ω @ 100 MHz bead | `C216149` | **60 Ω** — a factor of ten | `C81034` |
+
+Six of the nine are package errors, and a package error is the worst kind
+here: the part number is valid, the part is in stock, the value is right, and
+it arrives and does not fit the land pattern. Nothing in ERC, DRC, the
+netlist compare or the stock check looks at the body size of what was
+ordered against the footprint it was ordered for.
+
+`gen/verify_cart.py` now does exactly that, and it is the reason all nine
+were found at once. Two ways to run it:
+
+```
+python gen/verify_cart.py --live                # before there is a cart
+python gen/verify_cart.py <cart-export.csv>     # after, on what LCSC has
+```
+
+`--live` looks every number in `fab/order-combined.csv` up in the catalogue
+and compares package, value, tolerance and voltage against what the
+schematic asked for. Use that one — a wrong number found there is a one-line
+edit, and the same number found in a cart export has already been paid for.
+
+Two of its own bugs are worth knowing, because both reported correct parts as
+wrong: `1N4148W` parsed as the value "1" against a description leading with
+"150 mA", and the Würth bead's MPN `742792022` parsed as 742 megohms. Values
+that are really part numbers are now skipped rather than compared.
+
+### The substitution that made this necessary twice
+
+`check_stock.py` used to replace any part it could not find in the index. The
+index is JLCPCB's **assembly** library, which is a subset of what LCSC sells,
+so a miss there means "cannot be machine-placed", not "cannot be bought" —
+`C37593`, the ADS1115, is absent from it and was sitting in a real LCSC cart
+at the same moment. Substituting on a miss put `C28233`, a **16 V** capacitor,
+into a 100 V position on the 24 V input rail. Valid number, right value,
+right package, no voltage in its catalogue line to compare against.
+
+Unlisted parts now stay in the paste file unchanged, and any substitute that
+*is* made must state a voltage at or above the design's — silence is not
+evidence of a 100 V part.
+
 ## Before you order
 
 1. Re-check stock. These were read on 2026-08-12 and stock moves.
+   `python gen/check_stock.py`, then `python gen/verify_cart.py --live`.
 2. Confirm the DevKitC-1 header row pitch against Espressif's DXF. It is the
    one dimension that decides whether the board is usable at all.
 3. The two supercapacitors are the only line where the exact part matters

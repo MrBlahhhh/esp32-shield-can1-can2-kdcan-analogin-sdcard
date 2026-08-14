@@ -7,56 +7,56 @@ Parts order for 5 boards
    minimum order quantity and order multiple.
 
    part          order  needed  comment            designators
-   C49678          100      60  100nF 16V          C11,C12,C14,C15,C16,C18,C22,C23,C30,C31,C32,C5
+   C49678           80      60  100nF 16V          C11,C12,C14,C15,C16,C18,C22,C23,C30,C31,C32,C5
    C17414          100      50  10k                R19,R20,R21,R22,R23,R25,R28,R32,R34,R6
    C149504         100      40  100k               R1,R13,R15,R2,R29,R56,R57,R58
    C408389          50      35  BAT54S             D11,D13,D15,D17,D19,D20,D7
    C17513          100      35  1k                 R14,R37,R41,R45,R49,R53,R8
-   C13967          100      25  470nF 50V          C25,C26,C27,C28,C29
-   C134976          26      25  SMAJ26CA-13-F      D1,D5,D6,D8,D9
-   C223989          26      25  SMAJ40CA           D10,D12,D14,D16,D18
-   C856630         100      25  10k 0.1%           R39,R43,R47,R51,R54
-   C865368         100      25  2.21k 0.1%         R40,R44,R48,R52,R55
+   C13967           60      25  470nF 50V          C25,C26,C27,C28,C29
+   C134976          30      25  SMAJ26CA-13-F      D1,D5,D6,D8,D9
+   C223989          30      25  SMAJ40CA           D10,D12,D14,D16,D18
+   C856630          45      25  10k 0.1%           R39,R43,R47,R51,R54
+   C865368          60      25  2.21k 0.1%         R40,R44,R48,R52,R55
    C17634          100      20  33                 R11,R16,R17,R18
    C72998          100      20  60.4               R26,R27,R35,R36
    C2930178        100      20  2.49k              R38,R42,R46,R50
-   C13585          100      15  10uF 16V           C10,C13,C9
-   C1744           100      10  4.7nF 50V          C17,C24
-   C12891          100      10  22uF 16V           C2,C4
-   C1794           100      10  15pF 50V           C20,C21
-   C76584           11      10  ACT45B-510-2P-TL00 L1,L2
-   C719178          11      10  MF-MSMF020/60-2    PF1,PF2
+   C13585           40      15  10uF 16V           C10,C13,C9
+   C1744            50      10  4.7nF 50V          C17,C24
+   C12891           40      10  22uF 16V           C2,C4
+   C1794            30      10  15pF 50V           C20,C21
+   C76584           12      10  ACT45B-510-2P-TL00 L1,L2
+   C719178          15      10  MF-MSMF020/60-2    PF1,PF2
    C8545            50      10  2N7002             Q2,Q3
    C17673          100      10  4.7k               R10,R9
-   C13612           50      10  SRV05-4.TCT        U3,U4
+   C13612           15      10  SRV05-4.TCT        U3,U4
    C58988           11      10  TJA1051T/3,118     U5,U7
    C37593           11      10  ADS1115IDGSR       U8,U9
-   C28233          100       5  100nF 100V         C1
-   C28323          100       5  1uF 16V            C19
-   C46653          100       5  1nF 50V            C8
-   C2480             6       5  SS14               D2
-   C223993           6       5  SMAJ6.0A           D3
-   C2297           100       5  green              D4
-   C216149         100       5  742792022          FB1
+   C28233           50       5  100nF 100V         C1
+   C28323           30       5  1uF 16V            C19
+   C46653           40       5  1nF 50V            C8
+   C2480            50       5  SS14               D2
+   C223993          10       5  SMAJ6.0A           D3
+   C2297            50       5  green              D4
+   C81034           25       5  742792022          FB1
    C719027           6       5  DM3D-SF            J8
-   C17313            6       5  MF-MSMF050-2       PF3
-   C7472914         50       5  DMG2301L           Q1
+   C17313           10       5  MF-MSMF050-2       PF3
+   C7472914         10       5  DMG2301L           Q1
    C17408          100       5  100                R12
    C17713          100       5  47k                R24
    C17901          100       5  100                R3
-   C17955          100       5  20                 R30
+   C17955           50       5  20                 R30
    C17560          100       5  22k                R31
    C17985          100       5  750                R33
    C17695          100       5  43k 1%             R4
    C17506          100       5  18k 1%             R5
    C17828          100       5  8.2k               R59
    C17514          100       5  1M                 R7
-   C127592          50       5  TLV431ASN1T1G      U1
-   C7484            50       5  SN74AHCT1G125DBVR  U2
+   C127592          10       5  TLV431ASN1T1G      U1
+   C7484            10       5  SN74AHCT1G125DBVR  U2
    C626759           6       5  MCP2518FDT-H/SL    U6
-   C5186937          6       5  TX322540M4FBCE2T   Y1
+   C5186937         10       5  TX322540M4FBCE2T   Y1
 
-   48 distinct parts, 3432 pieces after MOQ rounding
+   48 distinct parts, 2596 pieces after MOQ rounding
    LCSC enforces the true per-part minimum at checkout, so
    anything undercalled here is bumped there, not rejected.
 

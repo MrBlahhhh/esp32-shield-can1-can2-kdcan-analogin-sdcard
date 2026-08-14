@@ -97,23 +97,51 @@ ELSEWHERE = [
 # are sold in reels of 20-100, anything with a manufacturer's name on it goes
 # in ones. Rounding passives to 100 satisfies every 20/50/100 multiple at once
 # and costs about thirty cents a line, which is cheaper than a second order.
-MOQ_EXACT = {}                      # per-part overrides, if one ever surprises us
-MOQ_PASSIVE = 100                   # 0402 .. 1210
-MOQ_DISCRETE = 50                   # SOT-23 / SOD-123 jellybean semiconductors
-_DISCRETE_FP = re.compile(r"SOT-\d|SOD-\d|SOT23|TO-236")
+# Real minimums, read out of an actual LCSC cart export and kept in
+# fab/lcsc-moq.csv. The guesses that used to live here -- 100 for anything
+# in a chip package, 50 for a SOT-23, extrapolated from six sampled parts --
+# were wrong on 45 lines out of 70. LCSC uses at least seven different
+# tiers: 1, 2, 5, 10, 20, 50 and 100, and which one a part uses does not
+# follow from its package.
+#
+# Refresh it by exporting your cart from LCSC and running
+#   python gen/import_lcsc_moq.py <the exported csv>
+MOQ_FILE = os.path.join(PROJ, "fab", "lcsc-moq.csv")
+
+
+def _load_moq():
+    table = {}
+    try:
+        with open(MOQ_FILE, encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                table[row["LCSC"].strip()] = (int(row["MOQ"] or 1),
+                                              int(row["Multiple"] or 1))
+    except Exception:
+        pass
+    return table
+
+
+MOQ_REAL = _load_moq()
+UNKNOWN_MOQ = set()          # parts with no measured minimum
 
 
 def moq_round(pn, qty, footprint):
-    """Bump a quantity up to something LCSC will actually accept."""
-    step = MOQ_EXACT.get(pn)
-    if step is None:
-        if re.search(r"_(0402|0603|0805|1206|1210)_", footprint):
-            step = MOQ_PASSIVE
-        elif _DISCRETE_FP.search(footprint):
-            step = MOQ_DISCRETE
-        else:
-            step = 1               # branded ICs, connectors, inductors
-    return ((qty + step - 1) // step) * step
+    """Bump a quantity to something LCSC will accept.
+
+    Uses the measured minimum when there is one. When there is not, the
+    quantity is left alone and the part is recorded in UNKNOWN_MOQ so the
+    caller can say so -- an unrounded line gets adjusted at checkout, which
+    is recoverable, where a wrongly rounded one is just wrong.
+    """
+    hit = MOQ_REAL.get(pn)
+    if hit is None:
+        UNKNOWN_MOQ.add(pn)
+        return qty
+    moq, mult = hit
+    q = max(qty, moq)
+    if mult > 1 and q % mult:
+        q = ((q + mult - 1) // mult) * mult
+    return q
 
 
 def main():

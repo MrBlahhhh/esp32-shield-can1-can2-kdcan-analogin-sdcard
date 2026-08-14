@@ -29,7 +29,7 @@ guessed rounding, which got several parts wrong.
   C17634        20      20      20       0   33
   C72998        20      20      20       0   60.4
   C2930178      20      20      20       0   2.49k
-  C908214       15      15       0      15   SMAJ5.0A
+  C113952       15      15       0      15   SMAJ5.0A
   C17557        15      15       0      15   220
   C17520        15      15       0      15   2.2k
   C1744         10      10      10       0   4.7nF 50V
@@ -41,16 +41,16 @@ guessed rounding, which got several parts wrong.
   C13612        10      10      10       0   SRV05-4.TCT
   C58988        10      10      10       0   TJA1051T/3,118
   C37593        10      10      10       0   ADS1115IDGSR
-  C1547         10      10       0      10   2.2nF 50V
+  C107146       10      10       0      10   2.2nF 50V
   C81598        10      10       0      10   1N4148W
-  C965800       10      10       0      10   XL-2012UYC
+  C84261        10      10       0      10   XL-2012UYC
   C20917        10      10       0      10   AO3400A
-  C25100        10      10       0      10   31.6k
+  C2930156      10      10       0      10   31.6k
   C28323         5       5       5       0   1uF 16V
   C46653         5       5       5       0   1nF 50V
   C223993        5       5       5       0   SMAJ6.0A
-  C2297          5       5       5       0   green
-  C216149        5       5       5       0   742792022
+  C2297          5       5       0       5   XL-2012UGC
+  C81034         5       5       5       0   742792022
   C719027        5       5       5       0   DM3D-SF
   C7472914       5       5       5       0   DMG2301L
   C17408         5       5       5       0   100
@@ -68,18 +68,17 @@ guessed rounding, which got several parts wrong.
   C626759        5       5       5       0   MCP2518FDT-H/SL
   C5186937       5       5       5       0   TX322540M4FBCE2T
   C387601        5       5       0       5   10uF 100V
-  C908224        5       5       0       5   SMAJ36A
+  C113967        5       5       0       5   SMAJ36A
   C8678          5       5       0       5   SS34
-  C965798        5       5       0       5   XL-2012UGC
-  C83467         5       5       0       5   ASWPA8050S330MT
-  C25089         5       5       0       5   121k
-  C17909         5       5       0       5   4.7k
+  C168133        5       5       0       5   FNR8040S330MT
+  C17438         5       5       0       5   121k
+  C17936         5       5       0       5   4.7k
   C477928        5       5       0       5   LM5164DDAR
 
-  64 distinct parts, 835 pieces
+  63 distinct parts, 830 pieces
   * = on both boards (8 parts)
 
-  Ordering the two projects separately would take 835 pieces.
+  Ordering the two projects separately would take 830 pieces.
   Combining saves 0 pieces of minimum-order padding.
 
 Consolidated -- same value and package, two part numbers
