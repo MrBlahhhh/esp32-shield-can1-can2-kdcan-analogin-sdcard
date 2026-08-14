@@ -264,9 +264,20 @@ ZONES = [
     # row along the bottom edge instead, between the microSD socket and the
     # hold-up cells. This predicate is FIRST so it wins over whatever zone
     # the probed net would otherwise have put them in.
-    ("testpoints", (28.0, 83.0, 36.0,  4.0), lambda p, n, s: p["prefix"] == "TP"),
+    ("testpoints", (26.0, 82.0, 38.0,  7.0), lambda p, n, s: p["prefix"] == "TP"),
 
     # ---- left strip: everything that hangs off the J1 socket row ----------
+    # The four channels are 8.7 mm wide on an 8.9 mm pitch, which leaves
+    # only 0.2 mm of board between one channel's parts and the next one's --
+    # and the closest two parts on this board are a ch1 diode and a ch2
+    # capacitor 0.34 mm apart, across that seam.
+    #
+    # It cannot be widened here. Narrowing the channels to buy the gap was
+    # tried at 8.5, 8.4 and 7.9: below 8.7 a resistor and a diode stop
+    # fitting side by side, the column wraps to an extra row, and 30 mm of
+    # height becomes 35.7. There is no more height either -- the harness is
+    # above and the ADC shelf below. Four channels properly spaced needs the
+    # board wider than 100 mm, which is the JLCPCB price step.
     ("ch1",       ( 2.0, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN1_A", "AIN1_PU", "AIN1_IN", "AIN1"}),
     ("ch2",       (10.9, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN2_A", "AIN2_PU", "AIN2_IN", "AIN2"}),
     ("ch3",       (19.8, 13.0,  8.7, 30.0), lambda p, n, s: n & {"AIN3_A", "AIN3_PU", "AIN3_IN", "AIN3"}),
@@ -274,14 +285,16 @@ ZONES = [
     # The return attenuator is a fifth channel in everything but name, and it
     # only works if it MATCHES the four above -- same values, same package,
     # same thermal environment. Placed beside them for that reason.
-    ("agnd",      ( 2.0, 44.0, 16.0,  8.0), lambda p, n, s: n & {"SENS_RTN", "AGND_A", "AGND_SENSE"}),
-    ("adc",       (18.5, 44.0, 18.5,  8.0), lambda p, n, s: p["mpn"] == "ADS1115IDGSR" or n & {"AIN_SP1", "AIN_SP2"} or (s == "Analog Inputs" and n <= {"+3V3", "GND"})),
+    ("agnd",      ( 2.0, 44.0, 23.0,  8.0), lambda p, n, s: n & {"SENS_RTN", "AGND_A", "AGND_SENSE"}),
+    ("adc",       (26.0, 44.0, 11.4,  8.0), lambda p, n, s: p["mpn"] == "ADS1115IDGSR" or n & {"AIN_SP1", "AIN_SP2"} or (s == "Analog Inputs" and n <= {"+3V3", "GND"})),
     # Battery sense moved under the dev board: four flat parts on a DC
     # line, and the left edge they used to hold is where the CAN1 plug
     # has to sit to be near its transceiver.
     ("vbatsns",   (42.5, 66.0, 17.9,  6.0), lambda p, n, s: "VBAT_SNS" in n),
-    ("can1",      (14.0, 54.0, 23.0, 13.0), lambda p, n, s: s == "CAN + K-line" and n & {"CAN_H", "CAN_L", "CANH_T", "CANL_T", "CAN_TX", "CAN_RX", "CAN_S", "TERM_A", "CAN_SPLIT"}),
-    ("sd",        ( 9.0, 68.0, 28.0, 12.0), lambda p, n, s: s == "SD Card"),
+    ("can1",      (10.0, 54.0, 27.0, 14.0), lambda p, n, s: s == "CAN + K-line" and n & {"CAN_H", "CAN_L", "CANH_T", "CANL_T", "CAN_TX", "CAN_RX", "CAN_S", "TERM_A", "CAN_SPLIT"}),
+    # One millimetre clear of can1 above and the test-point row below:
+    # abutting exactly, the packer put Q1 and R27 courtyard-to-courtyard.
+    ("sd",        ( 8.0, 69.0, 30.0, 12.0), lambda p, n, s: s == "SD Card"),
 
     # ---- right strip: the J3 row -----------------------------------------
     # The second CAN gets the most room of anything here: a controller, its
@@ -290,7 +303,8 @@ ZONES = [
     ("can2",      (66.0, 12.0, 24.0, 30.0), lambda p, n, s: n & {"CAN2_TXD", "CAN2_RXD", "CAN2_INT", "CAN2_SCK", "CAN2_MOSI", "CAN2_MISO", "CAN2_CS", "XTAL1", "XTAL2", "CAN2H_T", "CAN2L_T", "CAN2_H_C", "CAN2_L_C", "CAN2_S", "TERM2_A", "CAN2_SPLIT", "AUX_A", "AUX_B"}),
     ("kline",     (66.0, 43.0, 24.0, 15.0), lambda p, n, s: n & {"K_LINE", "K_TX", "K_RX", "K_TX_G", "K_TX_D", "K_PU"}),
     ("ws2812",    (66.0, 59.0, 24.0,  8.0), lambda p, n, s: n & {"LED_DIN_MCU", "LED_DIN_A", "LED_DIN", "LED_5V"}),
-    ("holdup",    (66.0, 68.0, 24.0, 13.0), lambda p, n, s: n & {"SCAP_TOP", "SCAP_MID"}),
+    # Right of the J3 socket, which runs down x 61..65 to y 69.
+    ("holdup",    (66.0, 68.0, 24.0, 15.0), lambda p, n, s: n & {"SCAP_TOP", "SCAP_MID"}),
 
     # ---- middle strip: under the dev board, short parts only -------------
     ("pfd",       (42.5, 14.0, 17.9, 12.0), lambda p, n, s: n & {"PFD_SENSE", "PWR_FAIL"}),
@@ -641,11 +655,28 @@ def main():
         print("  %d fixed-part clashes" % clashes)
 
     # --- shelf-pack each zone ---------------------------------------------
-    GAP = 0.4
-    # The microSD block is nothing but series resistors and pull-ups that all
-    # have to be routed through; 0.4 mm leaves no channel for a 0.2 mm track
-    # with clearance either side, so that one zone gets more elbow room.
-    ZONE_GAP = {"sd": 0.85}
+    # 1.2 mm, three times the 0.4 this board was laid out with, because it
+    # is being built by hand now rather than sent to an assembly house.
+    #
+    # Not the 2.5 mm the gate controller uses. That board carries half the
+    # parts on the same area; here 2.5 wants roughly 1400 mm2 more copper,
+    # which means growing past 100 mm and out of JLCPCB's cheap tier, and
+    # stretching the CAN, SPI and microSD runs to buy it. 1.2 mm fits inside
+    # the outline that already exists and still triples the elbow room.
+    GAP = 1.2
+    ZONE_GAP = {}
+    # A note on what this does NOT guarantee. The gap holds between parts in
+    # the SAME zone; two zones whose rectangles touch can still put a part
+    # from each against the boundary. Insetting every zone by half a gap
+    # fixes that in one line and was tried -- but it costs 1.2 mm of width
+    # per zone, and the four analogue channels are 8.7 mm single-file
+    # columns that stop being able to pair a resistor with a diode. Making
+    # that work needs the board wider than 100 mm, which is the price step.
+    #
+    # So the guarantee is per-zone, the median nearest-neighbour distance is
+    # 1.2 mm against 0.4 before, and the handful of pairs that end up closer
+    # are all across a zone boundary. audit_pcb's courtyard check is what
+    # catches any that actually touch.
     report = []
     for name, (zx, zy, zw, zh), _ in ZONES:
         gap = ZONE_GAP.get(name, GAP)
