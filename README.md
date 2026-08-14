@@ -118,6 +118,12 @@ the simulator's pin map and compares it to `netlist.txt`, so a model built
 from prose instead of the design fails loudly rather than validating the
 wrong board.
 
+## Wanted, not yet built
+
+[`docs/TODO.md`](docs/TODO.md) — additions nobody has started, as opposed to
+the defects below. Currently exhaust gas temperature through an MCP9600 on
+the I2C header, which needs no board change and is entirely firmware work.
+
 ## Known open
 
 - **`ROW_PITCH` is an assumption.** Espressif publish the DevKitC-1's outline
