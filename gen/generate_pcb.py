@@ -61,18 +61,36 @@ BOARD_H = 100.0
 #   bottom band   y 72.0 .. 88.0   below the dev board: the test-point row
 #                                  and the two hold-up cells
 #
-# ROW_PITCH IS NOT CONFIRMED. Espressif publish the DevKitC-1's outline only
-# as a DXF and it is not in the HTML user guide. 22.86 mm (0.9 in) is the
-# assumption; if the real part is 25.4 mm the sockets will not accept the
-# board. Get the DXF before ordering -- this one number is the difference
-# between a carrier and a coaster.
+# ROW_PITCH IS CONFIRMED, from Espressif's own DXF -- the actual file, not a
+# rendering of it: DXF_ESP32S3DevKitC1_V1_20210312CB.dxf. The pad columns
+# come out of the vertex list as three x values each, the pad's left edge,
+# centre and right edge:
+#
+#   left  row   0.640   1.270   1.910
+#   right row  23.500  24.130  24.770
+#
+# 22 pads per column, y 7.960 .. 61.300, which is 53.34 mm = 21 * 2.54 and
+# confirms the pitch at the same time.
+#
+#   ROW SPACING = 24.130 - 1.270 = 22.860 mm, exactly.
+#
+# It closes against the board too: the drawing labels a 1.27 mm inset each
+# side and a 25.40 mm width, and 1.270 + 22.860 + 1.270 = 25.400.
+#
+# Worth stating because a plausible-looking figure of 25.4 mm row spacing on
+# a 27.9 mm body circulates for this part. That is the ORIGINAL ESP32-DevKitC
+# with the WROOM-32 module, which really is wider. On the S3, 25.40 mm is the
+# BOARD WIDTH, not the row spacing -- and a 25.5 mm body with 25.4 mm rows
+# would put the pin centres 0.05 mm from the edge, which is the tell.
 ROW_PITCH = 22.86
 SOCK_X1 = 40.0                 # J2, mirrors the dev board's J1 header
 SOCK_X2 = SOCK_X1 + ROW_PITCH  # J3
 SOCK_Y = 14.0                  # top pin; the row runs 21 * 2.54 = 53.34 down
-DEVKIT_W = 25.5                # dev board body, across the rows
-DEVKIT_L = 63.0                # ... and along them. Also from the DXF, also
-                               # unconfirmed -- see ROW_PITCH above.
+# Body size, same drawing: 25.40 x 62.74 mm. These are deliberately left a
+# touch generous -- a keepout that is 0.1 mm too big costs nothing, one that
+# is 0.1 mm too small fouls the module.
+DEVKIT_W = 25.5                # drawing says 25.40
+DEVKIT_L = 63.0                # drawing says 62.74
 # The DevKitC-1 v1.1 has a USB-C at BOTH ends -- one to the native USB
 # peripheral, one to the UART bridge -- and both have to stay pluggable. The
 # dev board sits about 8.5 mm up on the sockets, so a plug's overmould sweeps

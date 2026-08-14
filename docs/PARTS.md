@@ -295,15 +295,15 @@ all: their minimum already covered the extra.
 2. After the cart exists, `python gen/learn_moq.py <export.csv>` and
    `python gen/verify_cart.py <export.csv>` — the first keeps the minimums
    current, the second checks what LCSC actually put in the basket.
-2. Confirm the DevKitC-1 header row pitch against Espressif's DXF. It is the
-   one dimension that decides whether the board is usable at all.
-3. The two supercapacitors are the only line where the exact part matters
+3. ~~Confirm the DevKitC-1 header row pitch.~~ Done — 22.86 mm exactly, read
+   out of Espressif's DXF. See the README's "Known open" for the numbers.
+4. The two supercapacitors are the only line where the exact part matters
    beyond its value: ESR must be under about 1 Ω. A 5.5 V coin-type EDLC is
    30–200 Ω and cannot source the 120 mA the hold-up has to carry.
    Cylindrical cells clear that easily — the Eaton HV0810 class is 200 mΩ,
    so two in series drop 48 mV at 120 mA. (An earlier draft of this page said
    "tens of milliohms"; that overstated it. 200 mΩ is the number, and it is
    still comfortably inside the requirement.)
-4. They are also the most expensive item on the board, and 1 F is far more
+5. They are also the most expensive item on the board, and 1 F is far more
    than anything needs. See [COST.md](COST.md) — 0.33 F is still six times
    the hold-up the parent board shipped with.

@@ -126,13 +126,20 @@ the I2C header, which needs no board change and is entirely firmware work.
 
 ## Known open
 
-- **`ROW_PITCH` is an assumption.** Espressif publish the DevKitC-1's outline
-  only as a DXF and it is not in the HTML user guide. 22.86 mm (0.9 in) is
-  what `gen/generate_pcb.py` uses. **If the real figure is 25.4 mm the
-  sockets will not accept the board.** Settle this before ordering.
+- ~~**`ROW_PITCH` is an assumption.**~~ **Settled — 22.86 mm is correct**, from
+  Espressif's own DXF. The pad columns sit at x = 1.270 and x = 24.130, 22
+  pads each over y 7.960–61.300 (53.34 mm = 21 × 2.54), so the spacing is
+  24.130 − 1.270 = **22.860 mm exactly**. It closes against the board width
+  too: 1.270 + 22.860 + 1.270 = 25.400.
+
+  Worth knowing that a figure of "25.4 mm row spacing on a 27.9 mm board"
+  circulates for this part. That is the **original ESP32-DevKitC** with the
+  WROOM-32 module, which really is wider. On the S3, 25.40 mm is the board
+  width — the tell is that a 25.5 mm body with 25.4 mm rows would put the pin
+  centres 0.05 mm from the edge.
 - **No antenna keepout.** The module is on the dev board now, radiating from
   about 8.5 mm above this laminate. Copper underneath still detunes it, but
-  which end of the outline to clear needs the same DXF.
+  which end of the outline to clear needs measuring off the same DXF.
 - **The hold-up timings are calculated, not measured.** 825 ms shed /
   254 ms unshed come from `t = C·dV/I`; the ngspice study for the supercap
   bank has not been written, and ESR and the Schottky's drop over
