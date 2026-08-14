@@ -158,8 +158,11 @@ Samsung lines on this board, and `C` is 100 V.
 The real question is narrower. Absence from the index means one of two
 things, because the index is JLCPCB's **assembly** library:
 
-- `C37593`, the ADS1115, is absent from it and was sitting in a real LCSC
-  cart at the same moment — it cannot be machine-placed, but it can be bought.
+- `C37593`, the ADS1115, is reported absent from it and was sitting in a real
+  LCSC cart at the same moment. It is not absent at all: JLCPCB quoted this
+  board at 48 items, every part type including that one. The index simply
+  answers inconsistently for it — present on some queries, missing on others.
+  So a miss here can just be the index being unreliable.
 - `C29055` and `C1794` were absent and LCSC rejected both, one "not found"
   and one "not available".
 

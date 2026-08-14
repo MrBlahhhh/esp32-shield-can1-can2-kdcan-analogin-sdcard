@@ -1,70 +1,68 @@
-# Where the money goes, and what to do about it
 
-> **Status: implemented, then partly walked back on purpose.** Parts are
-> **$15.02 a board against $18.29, an 18 % cut.** The 1 % resistors went back
-> to 0.1 % on the two that set the gain, because there is no calibration step
-> in the workflow -- see "Which resistors actually matter" below. The microSD
-> swap was dropped after checking it properly.
+## Have JLCPCB build it? Quote of 14 Aug 2026, 10 boards
 
-Prices read from LCSC on 2026-08-13, at the tier a five-board build lands in.
-Everything below is per board.
+Economic PCBA, top side only, 3-day PCB plus 3–4 day assembly, 1.41 kg.
 
-## Cost before these changes
+| | |
+|---|---|
+| PCB (10 off, special offer) | **$13.00** |
+| Setup fee | $8.18 |
+| Stencil | $1.53 |
+| Components, **48 items** | $145.73 |
+| Extended-component fees | $64.47 |
+| SMT assembly | $5.77 |
+| Nitrogen reflow | $0.99 |
+| Panel / large size | $0.00 |
+| **Total** | **$239.67** — $23.97 a board |
 
-| | per board |
-|---|---:|
-| SMD BOM, 49 lines | **$13.16** |
-| Through-hole (connectors, sockets, supercaps) | **$5.13** |
-| **Parts total** | **$18.29** |
-| PCB, 98 × 100 mm 4-layer, 5 off | see note |
-| ESP32-S3-DevKitC-1 | ~$8 |
+**48 items is every part type on the board**, `C37593` included. That matters
+because this page previously warned the ADS1115 was absent from JLCPCB's
+assembly library and that 20 TSSOP-10s would have to be hand-fitted whatever
+the quote said. **That was wrong.** The claim came from the tscircuit parts
+index, which reported `C37593` missing on some queries and present on others,
+and which was also wrong about it once before — it sat in a real LCSC cart
+while the index denied it. JLCPCB's own quoting system has it. Treat that
+index as evidence of stock and price, not as the authority on what can be
+placed; the quote form is the authority.
 
-Eight lines are 85 % of the SMD cost:
+### Against building it by hand
 
-| Part | qty | each | line | share |
-|---|---:|---:|---:|---:|
-| MCP2518FD CAN controller | 1 | $2.76 | $2.76 | 21 % |
-| ADS1115 ×2 | 2 | $1.32 | $2.64 | 20 % |
-| **1 kΩ 0.1 % thin film** | 5 | $0.297 | **$1.49** | 11 % |
-| Hirose DM3D-SF microSD | 1 | $1.12 | $1.12 | 9 % |
-| **10 kΩ 0.1 % thin film** | 5 | $0.186 | **$0.93** | 7 % |
-| TJA1051 ×2 | 2 | $0.46 | $0.92 | 7 % |
-| TVS diodes (SMAJ26CA/40CA) | 10 | ~$0.076 | $0.76 | 6 % |
-| 2.21 kΩ 0.1 % thin film | 5 | $0.053 | $0.27 | 2 % |
+|  | 10 boards | per board |
+|---|---|---|
+| JLCPCB assembled | $239.67 | $23.97 |
+| Bare PCB + parts, hand-built | $156.55 | $15.65 |
 
-Plus the two 1 F supercapacitors at roughly **$1.80 each** — the largest
-single item on the whole board once the through-hole side is counted.
+**1.53×** — a much better ratio than the gate controller's 2.3×, for two
+reasons: the fixed fees are spread over ten boards instead of five, and this
+board has four times the placements to spread them over. One-off fees are
+30% of this quote against 52% of the gate's.
 
-## Recommended changes
+The parts pricing is not where the difference is. JLCPCB charge $145.73 for
+components; the same parts on the LCSC order come to $143.55. **$2.18
+apart** — they are not marking parts up. The whole delta is:
 
-### 1. Precision only where it changes the answer — saves $1.47
+```
+  setup + extended fees   $72.65
+  assembly labour         $ 5.77
+  stencil + nitrogen      $ 2.52
+  parts margin            $ 2.18
+                          ──────
+                          $83.12
+```
 
-**Revised.** The original version of this section put all fifteen resistors on
-1 % and leaned on a per-channel calibration constant to recover the accuracy.
-That is the right trade only if somebody actually calibrates, and nobody was
-going to, so the divider now carries 0.1 % where it counts and 1 % where it
-does not.
+So $83 buys 1280 placements, about **6.5 cents each**. The gate works out at
+17 cents. Both are cheap against doing it by hand, and this board is far the
+better candidate — 128 placements per board, including two TSSOP-10s.
 
-#### Which resistors actually matter
+The $156.55 hand figure uses the marginal parts cost, since the combined LCSC
+order is going in anyway. A logger-only parts order paying its own minimums
+would be $163.25, putting hand assembly at $176.25 and narrowing the gap to
+$63.
 
-Gain is `Rlow / (Rser + Rup + Rlow)`, so each resistor moves it in proportion
-to its share of the total:
-
-| | share | gain error per 1 % of tolerance |
-|---|---:|---:|
-| 1 kΩ series | 0.076 | **0.076 %** |
-| 10 kΩ upper | 0.758 | 0.758 % |
-| 2.21 kΩ lower | 0.833 | 0.833 % |
-
-**The series resistor is ten times less sensitive than the other two — and it
-was the most expensive 0.1 % part on the board**, at $0.30 against $0.19 and
-$0.05. So it is the one to give up, and the two that set the ratio keep their
-tolerance.
-
-| build | worst case (linear) | realistic (RSS) | cost |
-|---|---:|---:|---:|
-| all 1 % | 1.667 % | 1.129 % | $0.05 |
-| **1 kΩ at 1 %, others 0.1 %** | **0.235 %** | **0.136 %** | **$1.21** |
+**Both boards assembled: $315.12.** The six through-hole lines are hand-fitted
+either way — Economic PCBA is SMT top-side only — so they are common to both
+routes and cancel out of the comparison.
+Ω at 1 %, others 0.1 %** | **0.235 %** | **0.136 %** | **$1.21** |
 | all 0.1 % | 0.167 % | 0.113 % | $2.68 |
 
 For reference the ADS1115's own gain error is 0.15 % typical and 0.30 %
