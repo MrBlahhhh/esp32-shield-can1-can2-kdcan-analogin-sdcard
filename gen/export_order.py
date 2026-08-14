@@ -60,7 +60,8 @@ ELSEWHERE = [
      "B4B-PH-K-S(LF)(SN), LCSC C131334. The CAN1 + power harness: OBD-II "
      "pins 16, 4, 6, 14"),
     ("J2",        1, "JST PH 4-pin vertical header, 2.00 mm",
-     "B4B-PH-K-S(LF)(SN), same part as J1. The aux bus: K-line or CAN 2, "
+     "B4B-PH-K-S(LF)(SN), LCSC C131334, same part as J1. The aux bus: "
+     "K-line or CAN 2, "
      "whichever AUXSEL is set to"),
     ("J9",        1, "JST PH 10-pin vertical header, 2.00 mm",
      "B10B-PH-K-S(LF)(SN), LCSC C158038. Sensor harness"),

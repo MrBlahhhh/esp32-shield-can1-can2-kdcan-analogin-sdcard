@@ -14,7 +14,7 @@ and there is nothing for the airflow to move.
 4. Through-hole last: the sockets, the microSD cage, the harness headers,
    the hold-up capacitors.
 5. Check the polarised parts before power:
-   `"C:\Program Files\KiCad\9.0in\python.exe" gen/audit_polarity.py`
+   `"C:\Program Files\KiCad\9.0\bin\python.exe" gen/audit_polarity.py`
    prints every orientable part with its position and what pin 1 must be.
 
 **No stencil.** These are placed one at a time; paste goes on by syringe for

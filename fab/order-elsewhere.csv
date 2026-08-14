@@ -1,7 +1,7 @@
 Designators,Qty per board,Order Qty,What,Note
 "C6, C7",2,10,"1 F 2.7 V low-ESR EDLC, 8 mm can, radial P3.5mm","Eaton HB1030-2R5105-R or equivalent. TWO THINGS TO CHECK. (1) ESR must be under about 1 ohm: a 5.5 V coin-type EDLC is 30-200 ohm and cannot source the 120 mA this has to carry, so the rail would collapse the instant it was asked to. Cylindrical cells are tens of milliohms. (2) Anything from 0.1 F up works -- 0.1 F still gives about 500 ms of hold-up against the 2.5 s the design point buys"
 J1,1,5,"JST PH 4-pin vertical header, 2.00 mm","B4B-PH-K-S(LF)(SN), LCSC C131334. The CAN1 + power harness: OBD-II pins 16, 4, 6, 14"
-J2,1,5,"JST PH 4-pin vertical header, 2.00 mm","B4B-PH-K-S(LF)(SN), same part as J1. The aux bus: K-line or CAN 2, whichever AUXSEL is set to"
+J2,1,5,"JST PH 4-pin vertical header, 2.00 mm","B4B-PH-K-S(LF)(SN), LCSC C131334, same part as J1. The aux bus: K-line or CAN 2, whichever AUXSEL is set to"
 J9,1,5,"JST PH 10-pin vertical header, 2.00 mm","B10B-PH-K-S(LF)(SN), LCSC C158038. Sensor harness"
 "J3, J4",2,10,"0.1"" pin SOCKET, 1x22 vertical","RECEPTACLES, not pin headers: a DevKitC-1 ships with male pins already soldered pointing down, and it drops into these. Buy 1x22 strips -- most 1x40 socket strips do not cut cleanly and you lose a position"
 "J5, J7, J10",3,15,"0.1"" pin header, 1x04 vertical",any
