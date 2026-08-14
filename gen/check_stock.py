@@ -265,6 +265,32 @@ def main():
         for pn, qty in cart:
             fh.write(pn + "," + str(qty) + chr(10))
 
+    # The same cart as a CSV for LCSC's BOM upload, which wants a header row
+    # and is happier with a description to fall back on. Swapped lines carry
+    # a note saying what they replaced, so the file explains itself when it
+    # is read back in six months.
+    what = {}
+    for _pn, _need, _stock, _hit, r in ok:
+        what[_pn] = r["Comment"]
+    for _pn, _need, _stock, _hit, r in short:
+        what[_pn] = r["Comment"]
+    for _pn, _need, r in unknown:
+        what[_pn] = r["Comment"]
+    for old, new, comment, _h, _s in swaps:
+        what[new] = comment
+    for pn, qty, _stock, mfr in tht:
+        what.setdefault(pn, mfr)
+    replaced = {new: old for old, new, _c, _h, _s in swaps}
+
+    csv_path = os.path.join(os.path.dirname(args.out), "order-verified.csv")
+    with open(csv_path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["LCSC Part Number", "Quantity", "Description", "Note"])
+        for pn, qty in cart:
+            note = ("replaces %s, which was short or unlisted"
+                    % replaced[pn]) if pn in replaced else ""
+            w.writerow([pn, qty, what.get(pn, ""), note])
+
     if swaps:
         lines.append("")
         lines.append("SWAPPED in fab/order-verified-paste.txt")
@@ -279,7 +305,7 @@ def main():
     text = "\n".join(lines) + "\n"
     open(args.out, "w", encoding="utf-8").write(text)
     print("\n" + text)
-    print("wrote %s and %s" % (args.out, cart_path))
+    print("wrote %s, %s and %s" % (args.out, cart_path, csv_path))
     return 1 if short else 0
 
 

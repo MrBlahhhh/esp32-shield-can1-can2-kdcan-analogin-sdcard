@@ -30,7 +30,7 @@ Through-hole lines, also checked
   C131334   x10    B4B-PH-K-S(LF)(SN)         stock 160000
   C158038   x5     B10B-PH-K-S(LF)(SN)        stock 2678
   C35449    x10    SRD-05VDC-SL-C             stock 36723
-  C474881   x20    KF301-5.0-2P               stock 65371
+  C474881   x20    KF301-5.0-2P               stock 173497
   C474882   x10    KF301-5.0-3P               stock 37218
 
 SWAPPED in fab/order-verified-paste.txt
