@@ -77,6 +77,80 @@ def read_elsewhere(path):
     return rows
 
 
+def assembled_only(args, na, nb, spare):
+    """The LCSC order when JLCPCB is assembling the boards.
+
+    Economic PCBA sources and fits every SMD part itself, so ordering those
+    from LCSC as well is buying them twice. Only the lines an SMT line will
+    not fit remain, which here means the through-hole ones -- relays,
+    terminal blocks, the optocoupler and the JST headers.
+
+    Quantities are the build, plus --spares if asked, rounded to each part's
+    real minimum. No spares by default: with the boards arriving assembled
+    there is no attrition to cover, only repair, and that is a separate
+    decision from this file."""
+    rows, elsewhere = [], []
+    for name, count, proj in ((THIS_NAME, na, PROJ),
+                              (OTHER_NAME, nb, args.other)):
+        for row in read_elsewhere(os.path.join(proj, "fab",
+                                               "order-elsewhere.csv")):
+            per = row.get("Qty per board") or row.get("Qty") or "0"
+            qty = int(per) * count if str(per).isdigit() else 0
+            m = re.search(r"LCSC (C\d+)", row.get("Note") or "")
+            if m and qty:
+                rows.append([m.group(1), qty, name, row.get("Designators", ""),
+                             row.get("What", "")])
+            else:
+                elsewhere.append((name, row.get("Designators", ""), qty,
+                                  row.get("What", "")))
+
+    merged = {}
+    for pn, qty, src, des, what in rows:
+        e = merged.setdefault(pn, [0, [], what])
+        e[0] += qty
+        e[1].append("%s %s" % (src, des))
+    for pn, e in merged.items():
+        q = e[0] + spare
+        e[0] = moq_round(pn, q, "") if args.moq else q
+
+    fab = os.path.join(PROJ, "fab")
+    os.makedirs(fab, exist_ok=True)
+    with open(os.path.join(fab, "order-tht-paste.csv"), "w", newline="",
+              encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["LCSC Part Number", "Quantity"])
+        for pn in sorted(merged):
+            w.writerow([pn, merged[pn][0]])
+    with open(os.path.join(fab, "order-tht-paste.txt"), "w",
+              encoding="utf-8") as fh:
+        for pn in sorted(merged):
+            fh.write("%s,%d\n" % (pn, merged[pn][0]))
+
+    print("LCSC order with JLCPCB assembling -- %d x %s + %d x %s"
+          % (na, THIS_NAME, nb, OTHER_NAME))
+    print("=" * 58)
+    print("Only what an SMT line will not fit. Every SMD part on both boards")
+    print("comes with the assembled boards; buying them here as well is")
+    print("paying for them twice.")
+    print("")
+    print("  %-10s %5s  %-34s %s" % ("part", "qty", "what", "used by"))
+    for pn in sorted(merged):
+        q, who, what = merged[pn]
+        print("  %-10s %5d  %-34s %s" % (pn, q, what[:34], "; ".join(who)))
+    print("")
+    print("  %d lines, %d pieces%s"
+          % (len(merged), sum(v[0] for v in merged.values()),
+             ", including %d spare of each" % spare if spare else
+             ", no spares"))
+    print("")
+    print("Still not from LCSC at all:")
+    for name, des, qty, what in elsewhere:
+        print("  [%s] %-14s x%-4d %s" % (name, des[:14], qty, what[:46]))
+    print("")
+    print("wrote fab/order-tht-paste.csv and .txt")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--boards", type=int, default=5,
@@ -92,6 +166,14 @@ def main():
     # they cost nothing at all.
     ap.add_argument("--spares", type=int, default=0,
                     help="extra pieces per line, added before MOQ rounding")
+    # When JLCPCB assembles the boards, it sources and fits every SMD part
+    # itself under Economic PCBA. Buying those from LCSC as well is paying
+    # twice -- $222.92 of overlap on the first order this was used for. What
+    # is still needed is only what the assembler will not fit: Economic PCBA
+    # is SMT top-side only, so the through-hole lines stay hand-work.
+    ap.add_argument("--assembled", action="store_true",
+                    help="only the parts an SMT assembler will NOT fit -- "
+                         "writes fab/order-tht-paste.csv")
     ap.add_argument("--other", default=OTHER_DEFAULT)
     # Rounding is ON now, and it is no longer a guess. fab/lcsc-moq.csv holds
     # real minimums read out of LCSC cart exports by gen/learn_moq.py, and
@@ -105,6 +187,9 @@ def main():
     na = args.boards
     nb = args.other_boards if args.other_boards is not None else args.boards
     spare = args.spares
+
+    if args.assembled:
+        return assembled_only(args, na, nb, spare)
 
     a = read_bom(os.path.join(PROJ, "fab", "bom.csv"))
     b = read_bom(os.path.join(args.other, "fab", "bom.csv"))
