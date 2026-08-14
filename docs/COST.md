@@ -1,29 +1,31 @@
 
-## Other fabs worth quoting, and the one thing that decides it
+## What to upload, per vendor
 
-**Tariffs follow country of ORIGIN, not who invoices you.** A Hong Kong or
-Singapore reseller shipping boards made in Shenzhen is a mainland-China
-origin at the border and attracts the same rate. Origin is where it was
-manufactured. That rules out the obvious workaround before it starts, and
-routing goods to disguise origin is customs fraud, not a saving.
+The generated files differ by who is building it, and the difference that
+bites is the part number. **JLCPCB matches on LCSC codes; everyone else
+matches on manufacturer part numbers.** Uploading `fab/bom.csv` to PCBWay or
+MacroFab returns every line unmatched, because `C37593` means nothing
+outside LCSC.
 
-So the question is not "who else is cheap" but "who else is cheap **and not
-mainland China**". The number to beat is not JLCPCB, it is **JLCPCB + 35%**.
+| | JLCPCB | PCBWay / MacroFab / Eurocircuits |
+|---|---|---|
+| Board | `fab/*-gerbers.zip` | same |
+| BOM | `fab/bom.csv` (LCSC codes) | `fab/assembly-bom-*.xlsx` (**MPNs**) |
+| Placement | `fab/positions.csv` | same |
 
-### Same country, same tariff — no help on duty
+`gen/export_assembly_bom.py` writes the MPN version. Columns are Designator,
+Quantity, Value, Package, Manufacturer, MPN, Type, Populate — the union of
+what those three ask for, including the SMD/PTH marking PCBWay wants.
 
-PCBWay, ALLPCB, Seeed Fusion, Elecrow, NextPCB are all Shenzhen. Worth
-quoting on price and turn, but every one lands with the same duty as JLCPCB.
-PCBWay and Seeed in particular will sometimes beat JLC on assembly setup
-fees, which on this project were 52% of the gate's quote.
+PCBWay's one hard rule is that **the pick-and-place designators must match
+the BOM exactly, with through-hole excluded**. Both hold here and are
+checked rather than assumed: 128 designators on the logger and 51 on the
+gate, identical in both files, with no through-hole in either — those live
+in `fab/order-elsewhere.csv` because no SMT line fits them.
 
-### Non-China Asia
-
-Taiwan, South Korea, Vietnam, Thailand, Malaysia and India all have real PCB
-capacity at different tariff rates. The catch is that little of it is aimed
-at 5-off prototypes with online quoting; most wants volume and a purchase
-order. India has a few prototype-friendly fabs serving mostly their domestic
-market. Worth a look only if a quote is easy to get.
+Through-hole is hand-fitted whoever builds the boards: relays, terminal
+blocks, the optocoupler and the JST headers.
+if a quote is easy to get.
 
 ### Europe — the most plausible alternative
 

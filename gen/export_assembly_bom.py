@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-BOM in MacroFab's import format.
+BOM keyed on manufacturer part numbers, for any assembler.
 
-  python gen/export_macrofab.py [--other PATH] [--out-dir fab]
+  python gen/export_assembly_bom.py [--other PATH] [--out-dir fab]
 
-MacroFab matches parts on the **manufacturer part number**, not on a
-distributor's code:
+MacroFab, PCBWay and Eurocircuits all want the same thing and JLCPCB does
+not, which is the whole point of this file.
+
+They match parts on the **manufacturer part number**, not on a
+distributor's code. MacroFab put it plainly:
 
     "If your supplied bill of materials has the manufacturer part number
      (MPN) and associated part designator the system will try to auto match
@@ -18,7 +21,9 @@ but LCSC. The MPNs are recovered from `fab/lcsc-moq.csv`, which accumulates LCSC
 code, MOQ, multiple, MPN, manufacturer and package out of real cart exports
 (see learn_moq.py). That is the only place this project sees an MPN.
 
-Required by MacroFab: designator and MPN. Package, value and populate are
+Required by MacroFab: designator and MPN. PCBWay asks for designator,
+quantity, package and part number, and for parts to be marked SMD or PTH.
+The union of what they all want is what is emitted. Package, value and populate are
 optional and all three are included, because they give the matcher something
 to disambiguate with and they let a human read the sheet.
 
@@ -42,7 +47,14 @@ PROJ = os.path.abspath(os.path.join(HERE, ".."))
 OTHER_DEFAULT = r"C:\Projects\gatecontrol\hw"
 
 COLUMNS = ["Designator", "Quantity", "Value", "Package", "Manufacturer",
-           "MPN", "Populate"]
+           "MPN", "Type", "Populate"]
+
+# Every line here is surface mount: fab/bom.csv is the assembly BOM, and the
+# through-hole parts live in fab/order-elsewhere.csv because no SMT line
+# fits them. PCBWay specifically asks that the pick-and-place file exclude
+# through-hole and that its designators match the BOM exactly -- which they
+# do, 128 and 51, checked by check_designators() below.
+SMD = "SMD"
 
 
 def load_ledger():
@@ -99,6 +111,7 @@ def read_bom(path, ledger):
             "Package": pkg,
             "Manufacturer": maker,
             "MPN": mpn,
+            "Type": SMD,
             "Populate": 1,
         })
     return rows, unresolved
@@ -155,7 +168,7 @@ def main():
             continue
         rows, unresolved = read_bom(src, ledger)
         n, dupes = check_designators(rows)
-        base = os.path.join(args.out_dir, "macrofab-bom-%s" % name)
+        base = os.path.join(args.out_dir, "assembly-bom-%s" % name)
         write(rows, base)
         print("%-7s %2d lines, %3d designators -> %s.xlsx"
               % (name, len(rows), n, os.path.basename(base)))
