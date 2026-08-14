@@ -268,6 +268,24 @@ parts it no longer does. The combined order uses it to break ties.
 quantised correctly.** Each round trip through the cart permanently improves
 the data, which is the closest thing to an API that exists here.
 
+### Board counts and spares
+
+The two projects are built in different numbers, so they are counted
+separately, and hand assembly loses parts:
+
+```
+python gen/export_combined_order.py --boards 10 --other-boards 5 --spares 2
+```
+
+Spares are added **before** rounding, which is what makes them nearly free.
+On a 100-piece minimum two extra cost nothing at all; they only move the
+lines whose minimum is 1 or 5 — the LM5164, the MCP2518FD, the SD socket,
+the relays, the terminal blocks. Those are exactly the lines where losing one
+part stops a build, and where there is no bag of spares in the drawer.
+
+At 10 loggers + 5 gates with two spares each, 33 of 69 lines do not move at
+all: their minimum already covered the extra.
+
 ## Before you order
 
 1. Re-check stock. These were read on 2026-08-12 and stock moves.

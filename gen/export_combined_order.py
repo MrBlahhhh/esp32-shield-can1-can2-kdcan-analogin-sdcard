@@ -80,7 +80,18 @@ def read_elsewhere(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--boards", type=int, default=5,
-                    help="how many of EACH board (default 5)")
+                    help="how many %s boards (default 5)" % THIS_NAME)
+    ap.add_argument("--other-boards", type=int, default=None,
+                    help="how many %s boards (defaults to --boards)"
+                         % OTHER_NAME)
+    # Hand assembly loses parts. An 0805 leaves the tweezers and is gone, and
+    # the ones that matter are not the resistors -- those come in hundreds
+    # whatever you ask for -- but the lines whose minimum is 1 or 5, where
+    # the order quantity is exactly the build quantity and losing one stops
+    # the build. Spares are added BEFORE rounding, so on a 100-piece minimum
+    # they cost nothing at all.
+    ap.add_argument("--spares", type=int, default=0,
+                    help="extra pieces per line, added before MOQ rounding")
     ap.add_argument("--other", default=OTHER_DEFAULT)
     # Rounding is ON now, and it is no longer a guess. fab/lcsc-moq.csv holds
     # real minimums read out of LCSC cart exports by gen/learn_moq.py, and
@@ -91,7 +102,9 @@ def main():
                     default=True,
                     help="do not round to the known minimum order quantities")
     args = ap.parse_args()
-    n = args.boards
+    na = args.boards
+    nb = args.other_boards if args.other_boards is not None else args.boards
+    spare = args.spares
 
     a = read_bom(os.path.join(PROJ, "fab", "bom.csv"))
     b = read_bom(os.path.join(args.other, "fab", "bom.csv"))
@@ -129,16 +142,21 @@ def main():
                     substitutions.append((c, f, p, keep))
         else:
             keep = next(iter(pns))
-        parts[keep] = {
-            "a": sum(v["a"] for v in pns.values()),
-            "b": sum(v["b"] for v in pns.values()),
-            "comment": c, "fp": f,
-        }
+        # Accumulate, do not assign. Two different (comment, footprint)
+        # groups can legitimately resolve to the same part number -- and
+        # when one of them was wrong they did: C387601 was the crystal on
+        # one board and, mistakenly, the 10uF 100V on the other. Assigning
+        # here made the second group silently replace the first, so one of
+        # the two quantities vanished from the order without a word.
+        e = parts.setdefault(keep, {"a": 0, "b": 0, "comment": c, "fp": f})
+        e["a"] += sum(v["a"] for v in pns.values())
+        e["b"] += sum(v["b"] for v in pns.values())
 
     rows, shared = [], 0
     saved = 0
     for pn, d in parts.items():
-        need = (d["a"] + d["b"]) * n
+        build = d["a"] * na + d["b"] * nb
+        need = build + spare
         # Ask for what the boards actually need and let LCSC's cart bump
         # each line to that part's own minimum.
         #
@@ -153,15 +171,15 @@ def main():
         # What it would have cost to order the two separately.
         sep = 0
         if d["a"]:
-            sep += (moq_round(pn, d["a"] * n, d["fp"]) if args.moq
-                    else d["a"] * n)
+            qa = d["a"] * na + spare
+            sep += moq_round(pn, qa, d["fp"]) if args.moq else qa
         if d["b"]:
-            sep += (moq_round(pn, d["b"] * n, d["fp"]) if args.moq
-                    else d["b"] * n)
+            qb = d["b"] * nb + spare
+            sep += moq_round(pn, qb, d["fp"]) if args.moq else qb
         if d["a"] and d["b"]:
             shared += 1
             saved += sep - order
-        rows.append((pn, order, need, d["a"] * n, d["b"] * n,
+        rows.append((pn, order, need, d["a"] * na, d["b"] * nb,
                      d["comment"], d["fp"], sep))
     rows.sort(key=lambda r: (-(r[3] > 0 and r[4] > 0), -r[2]))
 
@@ -182,18 +200,24 @@ def main():
             fh.write("%s,%d\n" % (pn, order))
 
     lines = []
-    lines.append("Combined parts order -- %d x %s + %d x %s"
-                 % (n, THIS_NAME, n, OTHER_NAME))
+    lines.append("Combined parts order -- %d x %s + %d x %s%s"
+                 % (na, THIS_NAME, nb, OTHER_NAME,
+                    ", +%d spare of each" % spare if spare else ""))
     lines.append("=" * 58)
     lines.append("")
     lines.append("Paste fab/order-combined-paste.txt into LCSC's quick-order")
     lines.append("box, or upload order-combined.csv to their BOM tool.")
     lines.append("")
-    lines.append("Quantities are what the boards NEED. LCSC will raise any")
-    lines.append("line to that part's own minimum at checkout -- which is")
-    lines.append("the right place for it to happen, because LCSC knows the")
-    lines.append("number and this file does not. --moq restores the old")
-    lines.append("guessed rounding, which got several parts wrong.")
+    lines.append("Quantities are the build plus the spares, rounded up to")
+    lines.append("each part's real minimum from fab/lcsc-moq.csv. Anything")
+    lines.append("not in that table is left alone and LCSC raises it at")
+    lines.append("checkout. --no-moq turns the rounding off.")
+    if spare:
+        lines.append("")
+        lines.append("Spares are added BEFORE rounding, so on a 100-piece")
+        lines.append("minimum they cost nothing. They only change the lines")
+        lines.append("whose minimum is 1 or 5 -- which are the ones where")
+        lines.append("losing a part actually stops the build.")
     lines.append("")
     lines.append("  %-9s %6s %7s %7s %7s  %s"
                  % ("part", "order", "needed", THIS_NAME, OTHER_NAME, "comment"))
@@ -227,13 +251,17 @@ def main():
     # number -- socket strip, M3 hardware, the two modules -- are the only
     # things that genuinely have to be bought elsewhere.
     extra, no_pn = [], []
-    for name, path in ((THIS_NAME, os.path.join(PROJ, "fab",
-                                                "order-elsewhere.csv")),
-                       (OTHER_NAME, os.path.join(args.other, "fab",
-                                                 "order-elsewhere.csv"))):
+    for name, count, path in (
+            (THIS_NAME, na, os.path.join(PROJ, "fab",
+                                         "order-elsewhere.csv")),
+            (OTHER_NAME, nb, os.path.join(args.other, "fab",
+                                          "order-elsewhere.csv"))):
         for row in read_elsewhere(path):
             per = row.get("Qty per board") or row.get("Qty") or "0"
-            qty = int(per) * n if str(per).isdigit() else 0
+            # No spares here -- added once per part after merging, below.
+            # A part can appear on several rows (the logger lists J1 and J2
+            # separately), and adding spares per row would multiply them.
+            qty = int(per) * count if str(per).isdigit() else 0
             m = re.search(r"LCSC (C\d+)", row.get("Note") or "")
             if m and qty:
                 extra.append((m.group(1), qty, name,
@@ -248,6 +276,12 @@ def main():
             e = merged.setdefault(pn, [0, [], what])
             e[0] += q
             e[1].append("%s %s" % (src, des))
+        # Spares once per part, then the same real-minimum rounding the SMD
+        # lines get. These are relays and terminal blocks -- minimums of 1
+        # and 5, so the spares are the whole point here.
+        for pn, e in merged.items():
+            e[0] = (moq_round(pn, e[0] + spare, "") if args.moq
+                    else e[0] + spare)
         lines.append("")
         lines.append("Through-hole, also from LCSC -- same basket")
         lines.append("-" * 58)
