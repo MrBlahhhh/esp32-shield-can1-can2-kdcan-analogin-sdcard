@@ -293,6 +293,18 @@ def main():
         for pn, qty in cart:
             fh.write(pn + "," + str(qty) + chr(10))
 
+    # The same two columns as a .csv. Not the same file as
+    # order-verified.csv below, which adds a description and a note for a
+    # human reading it back -- this one is bare part number and quantity,
+    # which is what LCSC's upload wants when it is not asked to map columns.
+    paste_csv = os.path.join(os.path.dirname(args.out),
+                             "order-verified-paste.csv")
+    with open(paste_csv, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["LCSC Part Number", "Quantity"])
+        for pn, qty in cart:
+            w.writerow([pn, qty])
+
     # The same cart as a CSV for LCSC's BOM upload, which wants a header row
     # and is happier with a description to fall back on. Swapped lines carry
     # a note saying what they replaced, so the file explains itself when it
@@ -333,7 +345,8 @@ def main():
     text = "\n".join(lines) + "\n"
     open(args.out, "w", encoding="utf-8").write(text)
     print("\n" + text)
-    print("wrote %s, %s and %s" % (args.out, cart_path, csv_path))
+    print("wrote %s,\n      %s,\n      %s and\n      %s"
+          % (args.out, cart_path, paste_csv, csv_path))
     return 1 if short else 0
 
 
