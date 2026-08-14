@@ -11,7 +11,7 @@ outside LCSC.
 |---|---|---|
 | Board | `fab/*-gerbers.zip` | same |
 | BOM | `fab/bom.csv` (LCSC codes) | `fab/assembly-bom-*.xlsx` (**MPNs**) |
-| Placement | `fab/positions.csv` | same |
+| Placement | `fab/positions.csv` | `fab/centroid-*.csv` |
 
 `gen/export_assembly_bom.py` writes the MPN version. Columns are Designator,
 Quantity, Value, Package, Manufacturer, MPN, Type, Populate — the union of
@@ -22,6 +22,28 @@ the BOM exactly, with through-hole excluded**. Both hold here and are
 checked rather than assumed: 128 designators on the logger and 51 on the
 gate, identical in both files, with no through-hole in either — those live
 in `fab/order-elsewhere.csv` because no SMT line fits them.
+
+### Two centroid files, and why
+
+`fab/positions.csv` is KiCad's own export and is what JLCPCB wants: X to the
+right, **Y negated**, because KiCad's Y axis points down and the export flips
+the sign rather than moving the origin. Every Y in it is negative -- the
+logger runs -91.5 to -13.0 on a board occupying 0..100. JLCPCB's tooling
+knows that convention.
+
+Not every assembler does, and an unstated origin with negative Y is
+ambiguous in exactly the way that gets a board built mirrored. So
+`gen/export_centroid.py` writes `fab/centroid-{logger,gate}.csv` with the
+origin at the **bottom-left corner of the board outline**, X right, Y up,
+both positive. That can be checked by eye: nothing negative, nothing larger
+than the board.
+
+It also filters to the BOM rather than to the board. Taking every footprint
+gave 140 rows against the logger's 128 BOM designators, because the board
+also carries connectors, sockets and supercapacitors. PCBWay asks
+specifically for "all the designators/references same as the ones in BOM,
+with THT designators excluded", and a centroid that disagrees with the BOM is
+the one thing they warn about. The script fails if the two ever diverge.
 
 Through-hole is hand-fitted whoever builds the boards: relays, terminal
 blocks, the optocoupler and the JST headers.
