@@ -50,8 +50,11 @@ PROJ = os.path.abspath(os.path.join(HERE, ".."))
 # both, sometimes on the same page.
 PKG = {
     "0402": ("0402",), "0603": ("0603",), "0805": ("0805",),
-    # Metric spellings too: LCSC writes a 1206 capacitor as SMD3215-2P.
-    "1206": ("1206", "3216", "3215"), "1210": ("1210", "3225"),
+    # Metric spellings too. NOT 3215 -- 1206 is 3216 metric, and 3215 is a
+    # crystal package. Accepting it here passed ECS-.327-7-34B-TR, a
+    # 32.768 kHz crystal in SMD3215-2P, as the converter's 10uF 100V bulk
+    # input capacitor on a C_1206_3216Metric land.
+    "1206": ("1206", "3216"), "1210": ("1210", "3225"),
     "1812": ("1812", "4532"),
     "D_SMA": ("SMA", "DO-214AC"),
     "D_SMB": ("SMB", "DO-214AA"),
@@ -84,6 +87,38 @@ def number(text):
     if not m:
         return None
     return float(m.group(1)) * MULT.get(m.group(2), 1.0)
+
+
+# Find a value of a given kind ANYWHERE in a catalogue line, by its unit.
+# Reading the leading token instead does not work: the line may lead with the
+# value ("100kO +/-1% 125mW 0805"), with the power ("125mW 2.21kOhm 150V"),
+# with the voltage ("100V 100nF X7R") or with the temperature range
+# ("-55C~+155C 10kOhm 125mW"). Anchoring on the unit sidesteps all of that,
+# and it will not match "+/-1%", "125mW", "150V" or "+/-25ppm/C".
+UNIT_RE = {
+    "F": r"(\d+(?:\.\d+)?)\s*([pnuµmk]?)F\b",
+    "H": r"(\d+(?:\.\d+)?)\s*([pnuµmk]?)H\b",
+    "R": r"(\d+(?:\.\d+)?)\s*([pnuµmkKM]?)\s*(?:Ω|ohm|R)\b",
+}
+
+
+def unit_of(want):
+    """Which unit the design's value is expressed in. A bare '100k' is a
+    resistor -- that is the convention the schematic uses."""
+    if re.search(r"[\d.]\s*[pnuµmk]?F\b", want):
+        return "F"
+    if re.search(r"[\d.]\s*[pnuµmk]?H\b", want):
+        return "H"
+    return "R"
+
+
+def values_in(desc, unit):
+    """Every value of that unit stated in a catalogue line."""
+    out = []
+    for m in re.finditer(UNIT_RE[unit], desc, re.IGNORECASE):
+        mult = MULT.get(m.group(2), MULT.get(m.group(2).lower(), 1.0))
+        out.append(float(m.group(1)) * mult)
+    return out
 
 
 def looks_like_value(text):
@@ -174,7 +209,7 @@ def main():
     design = {r["LCSC"].strip(): r
               for r in csv.DictReader(open(design_path, encoding="utf-8"))}
 
-    problems, checked = [], 0
+    problems, blind, checked = [], [], 0
     for pn, d in design.items():
         bought = subs.get(pn, pn)
         c = cart.get(bought)
@@ -202,17 +237,24 @@ def main():
         # the wrong value.
         want_n = number(want_v)
         if want_n is not None and looks_like_value(want_v):
-            # ...except when it does not. Some lines lead with the power
-            # rating -- "125mW 2.21kOhm 150V Thin Film" -- and some with the
-            # voltage -- "100V 100nF X7R +/-10% 0805". Skip any run of
-            # leading rating tokens before reading the value, or the 2.21k
-            # part reads as 0.125 and the 100nF reads as 100.
-            d2 = re.sub(r"^\s*(?:[\d.]+\s*(?:m?W|V)\s+)+", "", desc)
-            lead = re.match(r"\s*(\d+(?:\.\d+)?)\s*([pnumkKM]?)", d2)
-            got_n = None
-            if lead:
-                got_n = float(lead.group(1)) * MULT.get(lead.group(2), 1.0)
-            if got_n and abs(got_n - want_n) / max(want_n, 1e-15) > 0.02:
+            unit = unit_of(want_v)
+            got = values_in(desc, unit)
+            if not desc.strip():
+                # Some catalogue records carry no description at all. Nothing
+                # to check against; say so rather than call it a pass.
+                blind.append((pn, want_v))
+            elif not got:
+                # The design asked for a capacitance and the line states no
+                # capacitance anywhere. That is how a crystal got accepted as
+                # the converter's 10uF bulk input cap -- the old check read
+                # the leading token, "Crystal", found no number, and reported
+                # nothing at all.
+                problems.append(("NO VALUE", pn, want_v,
+                                 "no %s value in: %s"
+                                 % ({"F": "capacitance", "H": "inductance"}
+                                    .get(unit, "resistance"), desc[:36])))
+            elif not any(abs(g - want_n) / max(want_n, 1e-15) <= 0.02
+                         for g in got):
                 problems.append(("VALUE", pn, want_v,
                                  "cart says %s" % desc[:44]))
 
@@ -234,6 +276,12 @@ def main():
         # carries only JLCPCB's assembly library -- so it is reported apart
         # from the disagreements rather than counted as one.
         print("  not in the index, check by hand: %s\n" % ", ".join(missing))
+    if blind:
+        # No description in the record, so package and tolerance were checked
+        # but the value could not be. Said out loud rather than counted as a
+        # pass -- "checked" and "nothing to check with" are different answers.
+        print("  no description on record, value not checked: %s\n"
+              % ", ".join("%s (%s)" % (p, v) for p, v in blind))
     if not problems:
         print("  every line matches the value, package and rating the "
               "schematic asked for")

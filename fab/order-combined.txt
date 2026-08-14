@@ -67,7 +67,7 @@ guessed rounding, which got several parts wrong.
   C7484          5       5       5       0   SN74AHCT1G125DBVR
   C626759        5       5       5       0   MCP2518FDT-H/SL
   C5186937      10       5       5       0   TX322540M4FBCE2T
-  C387601        5       5       0       5   10uF 100V
+  C35689855      5       5       0       5   10uF 100V
   C113967       20       5       0       5   SMAJ36A
   C8678         20       5       0       5   SS34
   C168133        5       5       0       5   FNR8040S330MT

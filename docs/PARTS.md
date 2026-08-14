@@ -190,6 +190,45 @@ one number when the two projects disagree, and it picked by **quantity used**
 beat the live one. It now prefers whichever number has come back in a cart
 export, and falls back to quantity only between two equally unknown ones.
 
+## A 32.768 kHz crystal as the converter's bulk input capacitor
+
+Caught on the last check before the order went in, with a correct-looking
+cart open on screen. The gate board's generic table had `C387601` for
+`10uF100V` in 1206. `C387601` is an **ECS-.327-7-34B-TR, a 32.768 kHz
+crystal**, and it was sitting in the cart against C2 — the LM5164's bulk
+input capacitor on the 24 V rail.
+
+`verify_cart.py` had passed it twice, for two independent reasons, and both
+were bugs in the checker rather than bad luck:
+
+- **The package matched.** `SMD3215-2P` contains "3215", which was in the
+  accept list for 1206. It should never have been: 1206 is **3216** metric,
+  and 3215 is a crystal package. One digit.
+- **The value check silently did nothing.** It read the *leading* token of
+  the description. That description begins "Crystal", which is not a number,
+  so there was nothing to compare — and finding nothing to compare was
+  treated as agreement rather than as the loud signal it is.
+
+The value check now anchors on the **unit** and searches the whole line, so
+it does not care whether the description leads with the value, the power
+rating, the voltage or a temperature range — all four spellings occur. If
+the design asks for a capacitance and the line states no capacitance
+anywhere, that is now a reported disagreement. Where a record carries no
+description at all, the report says so by name instead of counting it as a
+pass; "checked" and "nothing to check with" are different answers.
+
+The replacement is `C35689855`, a TDK `C3216X6S2A106KT0A0E` — 10 µF 100 V
+X6S, **1206**, so the land pattern is unchanged and no board respin is
+needed. It is the only 10 µF 100 V part in 1206 in the catalogue; everything
+else at that value and rating is 1210. The 100 V is not over-specification:
+the input TVS is an SMAJ36A clamping at 58.1 V, which a 50 V part would not
+survive.
+
+The logger's table had the same key pointing at `C6872041`, which is not in
+the catalogue at all. Nothing used it, so it never surfaced — a dead number
+waiting for the first part that asked for that value. Both now point at
+`C35689855`.
+
 ## Minimum order quantities: the cart export is the only source
 
 MOQs cannot be derived. Across 78 real parts they take seven distinct values

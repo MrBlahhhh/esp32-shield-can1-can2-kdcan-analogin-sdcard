@@ -1,12 +1,12 @@
 %TF.GenerationSoftware,KiCad,Pcbnew,9.0.5*%
-%TF.CreationDate,2026-08-14T10:07:28-04:00*%
+%TF.CreationDate,2026-08-14T10:46:36-04:00*%
 %TF.ProjectId,esp32s3-can-sd-logger,65737033-3273-4332-9d63-616e2d73642d,rev?*%
 %TF.SameCoordinates,Original*%
 %TF.FileFunction,Copper,L3,Inr*%
 %TF.FilePolarity,Positive*%
 %FSLAX46Y46*%
 G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
-G04 Created by KiCad (PCBNEW 9.0.5) date 2026-08-14 10:07:28*
+G04 Created by KiCad (PCBNEW 9.0.5) date 2026-08-14 10:46:36*
 %MOMM*%
 %LPD*%
 G01*
