@@ -1,8 +1,18 @@
 # Assembly
 
-Hand-built with an iron and a hot-air station. **Order matters** — the parts
-that need hot air go on first, while the board around them is still empty
-and there is nothing for the airflow to move.
+**Which of these applies depends on how the boards were ordered**, and that
+was still open when the order was paused — see [COST.md](COST.md). If JLCPCB
+fitted the SMD, skip to step 4, the through-hole work, and then run the
+polarity check in step 5, which is worth doing on an assembled board too.
+
+The layout is spaced 1.2 mm for hand assembly either way, so nothing is lost
+by building it yourself.
+
+## By hand
+
+Iron and a hot-air station. **Order matters** — the parts that need hot air
+go on first, while the board around them is still empty and there is nothing
+for the airflow to move.
 
 1. **U8 and U9, the two ADS1115s.** TSSOP-10 at 0.50 mm pitch, the finest
    thing on the board. Paste, place, hot air. Doing these first means no
@@ -28,10 +38,11 @@ Work through this in order on the first board back from fab. Every step has
 an expected value; stop at the first one that misses and debug there, because
 later stages assume the earlier ones.
 
-**Before anything:** confirm the socket row pitch against a real DevKitC-1
-before you solder the sockets. `gen/generate_pcb.py` assumes 22.86 mm and
-that number came from a search result, not from Espressif's DXF. If it is
-wrong the board is scrap, and finding out with a ruler costs nothing.
+**Socket row pitch — settled, no longer a risk.** 22.86 mm, confirmed from
+Espressif's own DXF (committed as `docs/DXF_ESP32S3DevKitC1_V1_20210312CB.dxf`):
+the pad columns sit at x = 1.270 and x = 24.130, so 24.130 − 1.270 = 22.860
+exactly. Sit a real module on the board before soldering the sockets anyway
+— it costs nothing — but this is no longer the open question it was.
 
 **Bench setup:** the dev board NOT yet fitted, bench supply on the aux
 harness only where a stage says so, nothing on the sensor loom.

@@ -102,6 +102,13 @@ about $5.70 a board of savings that cost nothing functional.
 `fab/order-elsewhere.csv` lists what LCSC's assembly flow cannot supply:
 the through-hole connectors, the two supercapacitors and the dev board.
 
+**The order is ready and paused.** Everything is verified — gerbers, BOM,
+placements, both JLCPCB quotes and an LCSC cart — and it is on hold because
+US customs adds 35% of merchandise value. See
+[`docs/TODO.md`](docs/TODO.md) for the state of play and the resume
+checklist, and [`docs/COST.md`](docs/COST.md) for the quotes and the
+hand-build-versus-assembled comparison.
+
 ## Verification
 
 | | |

@@ -1,45 +1,45 @@
 
-## Have JLCPCB build it? Quote of 14 Aug 2026, 10 boards
+### Then customs took a third of it
 
-Economic PCBA, top side only, 3-day PCB plus 3–4 day assembly, 1.41 kg.
+At checkout the JLCPCB order came to **$475.71**, not $315.12:
 
 | | |
 |---|---|
-| PCB (10 off, special offer) | **$13.00** |
-| Setup fee | $8.18 |
-| Stencil | $1.53 |
-| Components, **48 items** | $145.73 |
-| Extended-component fees | $64.47 |
-| SMT assembly | $5.77 |
-| Nitrogen reflow | $0.99 |
-| Panel / large size | $0.00 |
-| **Total** | **$239.67** — $23.97 a board |
+| Merchandise | $315.12 |
+| Shipping | $50.29 — quoted $31.21 in the cart |
+| **Customs duty** | **$110.30** |
+| **Grand total** | **$475.71** |
 
-**48 items is every part type on the board**, `C37593` included. That matters
-because this page previously warned the ADS1115 was absent from JLCPCB's
-assembly library and that 20 TSSOP-10s would have to be hand-fitted whatever
-the quote said. **That was wrong.** The claim came from the tscircuit parts
-index, which reported `C37593` missing on some queries and present on others,
-and which was also wrong about it once before — it sat in a real LCSC cart
-while the index denied it. JLCPCB's own quoting system has it. Treat that
-index as evidence of stock and price, not as the authority on what can be
-placed; the quote form is the authority.
+That is a flat **35% of merchandise value**, and it is the single largest
+line item on the whole project — more than the PCBs, the assembly labour and
+the setup fees put together.
 
-### Against building it by hand
+**It does not, by itself, argue against assembly.** Duty is charged on goods
+value, and LCSC components are dutiable on exactly the same basis, so
+hand-building moves the merchandise from one Chinese invoice to another
+rather than avoiding the charge:
 
-|  | 10 boards | per board |
-|---|---|---|
-| JLCPCB assembled | $239.67 | $23.97 |
-| Bare PCB + parts, hand-built | $156.55 | $15.65 |
+|  | JLCPCB | LCSC | merchandise | duty @35% | before shipping |
+|---|---|---|---|---|---|
+| **A** hand-build | $20.00 | $236.15 | $256.15 | $89.66 | **$345.81** |
+| **B** assembled | $315.12 | $9.64 | $324.76 | $113.67 | **$438.43** |
 
-**1.53×** — a much better ratio than the gate controller's 2.3×, for two
-reasons: the fixed fees are spread over ten boards instead of five, and this
-board has four times the placements to spread them over. One-off fees are
-30% of this quote against 52% of the gate's.
+Duty widens the assembly premium from $68.61 to **$92.63**, which is 6.0
+cents a placement against 4.5. Worse, but not a different answer — assembly
+is still the right call on cost per unit of work avoided, and both routes
+need two shipments regardless, so freight is close to a wash.
 
-The parts pricing is not where the difference is. JLCPCB charge $145.73 for
-components; the same parts on the LCSC order come to $143.55. **$2.18
-apart** — they are not marking parts up. The whole delta is:
+What duty really changes is the **absolute** number. $475 for fifteen boards
+is a different proposition from $315, and it scales with every board added.
+
+### Decision: paused
+
+**The order is not placed.** Everything is verified and ready — gerbers, BOM,
+placements, both quotes, and a reduced LCSC cart — and it is on hold until
+the tariff position changes. Nothing about the design is waiting on anything.
+
+See [TODO.md](TODO.md) for the resume checklist.
+** — they are not marking parts up. The whole delta is:
 
 ```
   setup + extended fees   $72.65

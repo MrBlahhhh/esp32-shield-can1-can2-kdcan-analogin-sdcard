@@ -6,6 +6,53 @@ exists — everything here is an addition nobody has started.
 
 ---
 
+## Order: ready, paused on tariffs
+
+**Nothing is blocking this technically.** It is on hold because US customs
+adds **35% of merchandise value**, which turned a $315 order into $475.71.
+See [COST.md](COST.md) for the full breakdown and why it does not change the
+build-versus-assemble answer, only the absolute number.
+
+State as of 14 Aug 2026, all verified:
+
+| | |
+|---|---|
+| Route chosen | **JLCPCB assembles both boards** — Economic PCBA, top side |
+| Logger | 10 boards, $13.00 PCB + $226.67 assembly, 48/48 part types placed |
+| Gate | 5 boards, $7.00 PCB + $68.45 assembly, 25/25 part types placed |
+| JLCPCB merchandise | $315.12 |
+| LCSC | `fab/order-tht-paste.csv` — 6 through-hole lines, 75 pieces, $9.64 |
+| Duty + shipping | $110.30 + $50.29 on the JLCPCB side |
+
+### To resume
+
+1. **Re-run the checks; they are cheap and stock moves.**
+   `python gen/check_stock.py`, then `python gen/verify_cart.py --live`.
+   Both should report nothing.
+2. **Regenerate the orders** at whatever board counts you want:
+   ```
+   python gen/export_combined_order.py --boards 10 --other-boards 5 --assembled
+   ```
+   Drop `--assembled` and add `--spares 2` if hand-building after all.
+3. Re-upload the gerbers, `fab/bom.csv` and `fab/positions.csv` to JLCPCB.
+   The quotes above will have moved.
+4. After the LCSC cart exists, `python gen/learn_moq.py <export.csv>` to keep
+   the minimums current, and `python gen/verify_cart.py <export.csv>`.
+
+### Worth reconsidering when it restarts
+
+- **Board counts.** 10 loggers was chosen when the marginal cost of extra
+  boards looked small. With 35% on top, each extra board carries its duty
+  too. Five of each is $200-ish less.
+- **Two layers instead of four** for the gate controller. Noted in that
+  project's `docs/ORDER.md` as an untested saving; it only matters if the
+  fab bill is being squeezed.
+- **Spares.** The current LCSC order has none, because assembled boards have
+  no attrition to cover. If a board arrives faulty there is nothing to repair
+  it with, and the SMD side means LCSC minimums all over again.
+
+---
+
 ## Exhaust gas temperature, via MCP9600
 
 **Status:** scoped, not started. **Needs no board change.**
