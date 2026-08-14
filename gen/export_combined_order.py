@@ -76,6 +76,9 @@ def main():
     ap.add_argument("--boards", type=int, default=5,
                     help="how many of EACH board (default 5)")
     ap.add_argument("--other", default=OTHER_DEFAULT)
+    ap.add_argument("--moq", action="store_true",
+                    help="pre-round to a GUESSED minimum order quantity "
+                         "(off by default -- see the note below)")
     args = ap.parse_args()
     n = args.boards
 
@@ -118,13 +121,25 @@ def main():
     saved = 0
     for pn, d in parts.items():
         need = (d["a"] + d["b"]) * n
-        order = moq_round(pn, need, d["fp"])
+        # Ask for what the boards actually need and let LCSC's cart bump
+        # each line to that part's own minimum.
+        #
+        # This used to pre-round to a guessed minimum -- 100 for anything in
+        # a chip package, 50 for a SOT-23 -- extrapolated from six sampled
+        # parts. Several of those guesses were wrong, and a wrong guess is
+        # worse in both directions: too high and you buy a hundred of
+        # something sold in twenties, too low or off-multiple and the line
+        # is rejected outright. LCSC knows the real number for every part
+        # and applies it at checkout; guessing at it from here does not.
+        order = moq_round(pn, need, d["fp"]) if args.moq else need
         # What it would have cost to order the two separately.
         sep = 0
         if d["a"]:
-            sep += moq_round(pn, d["a"] * n, d["fp"])
+            sep += (moq_round(pn, d["a"] * n, d["fp"]) if args.moq
+                    else d["a"] * n)
         if d["b"]:
-            sep += moq_round(pn, d["b"] * n, d["fp"])
+            sep += (moq_round(pn, d["b"] * n, d["fp"]) if args.moq
+                    else d["b"] * n)
         if d["a"] and d["b"]:
             shared += 1
             saved += sep - order
@@ -155,6 +170,12 @@ def main():
     lines.append("")
     lines.append("Paste fab/order-combined-paste.txt into LCSC's quick-order")
     lines.append("box, or upload order-combined.csv to their BOM tool.")
+    lines.append("")
+    lines.append("Quantities are what the boards NEED. LCSC will raise any")
+    lines.append("line to that part's own minimum at checkout -- which is")
+    lines.append("the right place for it to happen, because LCSC knows the")
+    lines.append("number and this file does not. --moq restores the old")
+    lines.append("guessed rounding, which got several parts wrong.")
     lines.append("")
     lines.append("  %-9s %6s %7s %7s %7s  %s"
                  % ("part", "order", "needed", THIS_NAME, OTHER_NAME, "comment"))

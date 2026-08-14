@@ -4,77 +4,83 @@ Combined parts order -- 5 x logger + 5 x gate
 Paste fab/order-combined-paste.txt into LCSC's quick-order
 box, or upload order-combined.csv to their BOM tool.
 
+Quantities are what the boards NEED. LCSC will raise any
+line to that part's own minimum at checkout -- which is
+the right place for it to happen, because LCSC knows the
+number and this file does not. --moq restores the old
+guessed rounding, which got several parts wrong.
+
   part       order  needed  logger    gate  comment
-  C149504      100      65      40      25 * 100k
-  C17414       100      55      50       5 * 10k
-  C17513       100      55      35      20 * 1k
-  C12891       100      20      10      10 * 22uF 16V
-  C13585       100      20      15       5 * 10uF 16V
-  C29055       100      15       5      10 * 100nF 100V
+  C149504       65      65      40      25 * 100k
+  C17414        55      55      50       5 * 10k
+  C17513        55      55      35      20 * 1k
+  C12891        20      20      10      10 * 22uF 16V
+  C13585        20      20      15       5 * 10uF 16V
+  C29055        15      15       5      10 * 100nF 100V
   C2480         10      10       5       5 * SS14
   C17313        10      10       5       5 * MF-MSMF050-2
-  C49678       100      35       0      35   100nF 50V
-  C408389       50      35      35       0   BAT54S
-  C13967       100      25      25       0   470nF 50V
+  C49678        35      35       0      35   100nF 50V
+  C408389       35      35      35       0   BAT54S
+  C13967        25      25      25       0   470nF 50V
   C134976       25      25      25       0   SMAJ26CA-13-F
   C223989       25      25      25       0   SMAJ40CA
-  C856630      100      25      25       0   10k 0.1%
-  C865368      100      25      25       0   2.21k 0.1%
-  C17634       100      20      20       0   33
-  C72998       100      20      20       0   60.4
-  C2930178     100      20      20       0   2.49k
+  C856630       25      25      25       0   10k 0.1%
+  C865368       25      25      25       0   2.21k 0.1%
+  C17634        20      20      20       0   33
+  C72998        20      20      20       0   60.4
+  C2930178      20      20      20       0   2.49k
   C908214       15      15       0      15   SMAJ5.0A
-  C17557       100      15       0      15   220
-  C17520       100      15       0      15   2.2k
-  C1744        100      10      10       0   4.7nF 50V
-  C1794        100      10      10       0   15pF 50V
+  C17557        15      15       0      15   220
+  C17520        15      15       0      15   2.2k
+  C1744         10      10      10       0   4.7nF 50V
+  C1794         10      10      10       0   15pF 50V
   C76584        10      10      10       0   ACT45B-510-2P-TL003
   C719178       10      10      10       0   MF-MSMF020/60-2
-  C8545         50      10      10       0   2N7002
-  C17673       100      10      10       0   4.7k
-  C13612        50      10      10       0   SRV05-4.TCT
+  C8545         10      10      10       0   2N7002
+  C17673        10      10      10       0   4.7k
+  C13612        10      10      10       0   SRV05-4.TCT
   C58988        10      10      10       0   TJA1051T/3,118
   C37593        10      10      10       0   ADS1115IDGSR
-  C1547        100      10       0      10   2.2nF 50V
-  C81598        50      10       0      10   1N4148W
-  C965800      100      10       0      10   XL-2012UYC
-  C20917        50      10       0      10   AO3400A
-  C25100       100      10       0      10   31.6k
-  C28323       100       5       5       0   1uF 16V
-  C46653       100       5       5       0   1nF 50V
+  C1547         10      10       0      10   2.2nF 50V
+  C81598        10      10       0      10   1N4148W
+  C965800       10      10       0      10   XL-2012UYC
+  C20917        10      10       0      10   AO3400A
+  C25100        10      10       0      10   31.6k
+  C28323         5       5       5       0   1uF 16V
+  C46653         5       5       5       0   1nF 50V
   C223993        5       5       5       0   SMAJ6.0A
-  C2297        100       5       5       0   green
-  C2661452     100       5       5       0   742792022
+  C2297          5       5       5       0   green
+  C216149        5       5       5       0   742792022
   C719027        5       5       5       0   DM3D-SF
-  C7472914      50       5       5       0   DMG2301L
-  C17408       100       5       5       0   100
-  C17713       100       5       5       0   47k
-  C17901       100       5       5       0   100
-  C17955       100       5       5       0   20
-  C17560       100       5       5       0   22k
-  C17985       100       5       5       0   750
-  C17695       100       5       5       0   43k 1%
-  C17506       100       5       5       0   18k 1%
-  C17828       100       5       5       0   8.2k
-  C17514       100       5       5       0   1M
-  C127592       50       5       5       0   TLV431ASN1T1G
-  C7484         50       5       5       0   SN74AHCT1G125DBVR
+  C7472914       5       5       5       0   DMG2301L
+  C17408         5       5       5       0   100
+  C17713         5       5       5       0   47k
+  C17901         5       5       5       0   100
+  C17955         5       5       5       0   20
+  C17560         5       5       5       0   22k
+  C17985         5       5       5       0   750
+  C17695         5       5       5       0   43k 1%
+  C17506         5       5       5       0   18k 1%
+  C17828         5       5       5       0   8.2k
+  C17514         5       5       5       0   1M
+  C127592        5       5       5       0   TLV431ASN1T1G
+  C7484          5       5       5       0   SN74AHCT1G125DBVR
   C626759        5       5       5       0   MCP2518FDT-H/SL
   C5186937       5       5       5       0   TX322540M4FBCE2T
-  C387601      100       5       0       5   10uF 100V
+  C387601        5       5       0       5   10uF 100V
   C908224        5       5       0       5   SMAJ36A
   C8678          5       5       0       5   SS34
-  C965798      100       5       0       5   XL-2012UGC
-  C340244        5       5       0       5   ASWPA8050S330MT
-  C25089       100       5       0       5   121k
-  C17909       100       5       0       5   4.7k
+  C965798        5       5       0       5   XL-2012UGC
+  C83467         5       5       0       5   ASWPA8050S330MT
+  C25089         5       5       0       5   121k
+  C17909         5       5       0       5   4.7k
   C477928        5       5       0       5   LM5164DDAR
 
-  64 distinct parts, 4465 pieces
+  64 distinct parts, 835 pieces
   * = on both boards (8 parts)
 
-  Ordering the two projects separately would take 5065 pieces.
-  Combining saves 600 pieces of minimum-order padding.
+  Ordering the two projects separately would take 835 pieces.
+  Combining saves 0 pieces of minimum-order padding.
 
 Consolidated -- same value and package, two part numbers
 ----------------------------------------------------------
@@ -88,13 +94,12 @@ Consolidated -- same value and package, two part numbers
 
 Through-hole, also from LCSC -- same basket
 ----------------------------------------------------------
-  C124621   x5    AC-input optocoupler, DIP-4, LTV-814           gate U2
+  C10790    x5    AC-input optocoupler, DIP-4, LTV-814           gate U2
   C131334   x10   JST PH 4-pin vertical header, 2.00 mm          logger J1; logger J2
-  C132308   x10   SPDT power relay, 5 V coil, SANYOU/Songle SRD- gate K1, K2
   C158038   x5    JST PH 10-pin vertical header, 2.00 mm         logger J9
-  C8465     x10   5.00 mm screw terminal, 2 pole (MaiXu MX126 /  gate J1, J7
-  C8466     x10   5.00 mm screw terminal, 3 pole, same family    gate J5, J8
-  C8467     x5    5.00 mm screw terminal, 4 pole, same family    gate J6
+  C35449    x10   SPDT power relay, 5 V coil, SANYOU/Songle SRD- gate K1, K2
+  C474881   x20   5.00 mm screw terminal, 2 pole (MaiXu MX126 /  gate J1, J7; gate J6
+  C474882   x10   5.00 mm screw terminal, 3 pole, same family    gate J5, J8
 
 Buy elsewhere -- no LCSC part number
 ----------------------------------------------------------

@@ -37,7 +37,7 @@ Parts order for 5 boards
    C2480             6       5  SS14               D2
    C223993           6       5  SMAJ6.0A           D3
    C2297           100       5  green              D4
-   C2661452        100       5  742792022          FB1
+   C216149         100       5  742792022          FB1
    C719027           6       5  DM3D-SF            J8
    C17313            6       5  MF-MSMF050-2       PF3
    C7472914         50       5  DMG2301L           Q1

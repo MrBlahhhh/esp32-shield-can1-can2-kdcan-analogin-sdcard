@@ -230,13 +230,34 @@ def main():
     # back in from the old file and the cart contains both the part that is
     # not in stock and its replacement.
     have |= {old for old, _n, _c, _h, _s in swaps}
+    # And CHECK them on the way through. These rode into the cart unverified
+    # once already and one of them -- a relay -- was a part number LCSC has
+    # never heard of. A line that is not in the assembly BOM is still a line
+    # in the order.
     src = os.path.join(os.path.dirname(args.out), "order-combined-paste.txt")
+    tht = []
     if os.path.exists(src):
         for line in open(src, encoding="utf-8"):
             bits = line.strip().split(",")
-            if len(bits) == 2 and bits[0] not in have:
-                cart.append((bits[0], int(bits[1])))
-                have.add(bits[0])
+            if len(bits) != 2 or bits[0] in have:
+                continue
+            pn, qty = bits[0], int(bits[1])
+            hit = find(pn, "", "")
+            tht.append((pn, qty, None if hit is None else (hit.get("stock") or 0),
+                        "" if hit is None else (hit.get("mfr") or "")))
+            cart.append((pn, qty))
+            have.add(pn)
+            time.sleep(0.4)
+    if tht:
+        lines.append("")
+        lines.append("Through-hole lines, also checked")
+        lines.append("-" * 62)
+        for pn, qty, stock, mfr in tht:
+            lines.append("  %-9s x%-5d %-26s %s"
+                         % (pn, qty, mfr[:26],
+                            "NOT IN INDEX -- verify on LCSC" if stock is None
+                            else ("stock %d" % stock if stock >= qty
+                                  else "SHORT, stock %d" % stock)))
 
     cart_path = os.path.join(os.path.dirname(args.out),
                              "order-verified-paste.txt")
