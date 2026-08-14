@@ -1,3 +1,27 @@
+# Assembly
+
+Hand-built with an iron and a hot-air station. **Order matters** — the parts
+that need hot air go on first, while the board around them is still empty
+and there is nothing for the airflow to move.
+
+1. **U8 and U9, the two ADS1115s.** TSSOP-10 at 0.50 mm pitch, the finest
+   thing on the board. Paste, place, hot air. Doing these first means no
+   0805 within blowing distance.
+2. **U2, U3, U4** — 0.95 mm pitch. Same treatment or drag-solder with flux
+   and braid, whichever you prefer.
+3. Everything else with the iron, working outward. The passives sit 1.2 mm
+   apart, which is what that spacing was for.
+4. Through-hole last: the sockets, the microSD cage, the harness headers,
+   the hold-up capacitors.
+5. Check the polarised parts before power:
+   `"C:\Program Files\KiCad\9.0in\python.exe" gen/audit_polarity.py`
+   prints every orientable part with its position and what pin 1 must be.
+
+**No stencil.** These are placed one at a time; paste goes on by syringe for
+the few parts that get hot air. A stencil only pays for itself if you switch
+to paste-everything-and-reflow, and that is a different workflow from the
+one this layout was spaced for.
+
 # First-power bring-up checklist
 
 Work through this in order on the first board back from fab. Every step has
