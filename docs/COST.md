@@ -1,71 +1,61 @@
 
-### Then customs took a third of it
+## Other fabs worth quoting, and the one thing that decides it
 
-At checkout the JLCPCB order came to **$475.71**, not $315.12:
+**Tariffs follow country of ORIGIN, not who invoices you.** A Hong Kong or
+Singapore reseller shipping boards made in Shenzhen is a mainland-China
+origin at the border and attracts the same rate. Origin is where it was
+manufactured. That rules out the obvious workaround before it starts, and
+routing goods to disguise origin is customs fraud, not a saving.
 
-| | |
-|---|---|
-| Merchandise | $315.12 |
-| Shipping | $50.29 — quoted $31.21 in the cart |
-| **Customs duty** | **$110.30** |
-| **Grand total** | **$475.71** |
+So the question is not "who else is cheap" but "who else is cheap **and not
+mainland China**". The number to beat is not JLCPCB, it is **JLCPCB + 35%**.
 
-That is a flat **35% of merchandise value**, and it is the single largest
-line item on the whole project — more than the PCBs, the assembly labour and
-the setup fees put together.
+### Same country, same tariff — no help on duty
 
-**It does not, by itself, argue against assembly.** Duty is charged on goods
-value, and LCSC components are dutiable on exactly the same basis, so
-hand-building moves the merchandise from one Chinese invoice to another
-rather than avoiding the charge:
+PCBWay, ALLPCB, Seeed Fusion, Elecrow, NextPCB are all Shenzhen. Worth
+quoting on price and turn, but every one lands with the same duty as JLCPCB.
+PCBWay and Seeed in particular will sometimes beat JLC on assembly setup
+fees, which on this project were 52% of the gate's quote.
 
-|  | JLCPCB | LCSC | merchandise | duty @35% | before shipping |
-|---|---|---|---|---|---|
-| **A** hand-build | $20.00 | $236.15 | $256.15 | $89.66 | **$345.81** |
-| **B** assembled | $315.12 | $9.64 | $324.76 | $113.67 | **$438.43** |
+### Non-China Asia
 
-Duty widens the assembly premium from $68.61 to **$92.63**, which is 6.0
-cents a placement against 4.5. Worse, but not a different answer — assembly
-is still the right call on cost per unit of work avoided, and both routes
-need two shipments regardless, so freight is close to a wash.
+Taiwan, South Korea, Vietnam, Thailand, Malaysia and India all have real PCB
+capacity at different tariff rates. The catch is that little of it is aimed
+at 5-off prototypes with online quoting; most wants volume and a purchase
+order. India has a few prototype-friendly fabs serving mostly their domestic
+market. Worth a look only if a quote is easy to get.
 
-What duty really changes is the **absolute** number. $475 for fifteen boards
-is a different proposition from $315, and it scales with every board added.
+### Europe — the most plausible alternative
 
-### Decision: paused
+- **Aisler** (Netherlands) — small-batch, hobbyist-friendly, EU-made, online
+  quoting. Closest thing to an OSH Park in Europe.
+- **Eurocircuits** (Belgium/Germany) — prototype and small series, and they
+  do assembly. Well regarded, properly engineered, online quoting.
+- **Beta Layout / PCB-Pool**, **Multi-CB** (Germany) — similar.
 
-**The order is not placed.** Everything is verified and ready — gerbers, BOM,
-placements, both quotes, and a reduced LCSC cart — and it is on hold until
-the tariff position changes. Nothing about the design is waiting on anything.
+EU prices are higher than mainland China, but the comparison is against
+JLC+35% rather than JLC, and EU→US duty is a different and generally lower
+rate. Eurocircuits is the one to quote for assembly, Aisler for bare boards.
 
-See [TODO.md](TODO.md) for the resume checklist.
-** — they are not marking parts up. The whole delta is:
+### United States — priced, not competitive
 
-```
-  setup + extended fees   $72.65
-  assembly labour         $ 5.77
-  stencil + nitrogen      $ 2.52
-  parts margin            $ 2.18
-                          ──────
-                          $83.12
-```
+MacroFab quoted **$1200 and that excluded pick and place**, against JLCPCB's
+$475.71 all in. Duty would have to reach **265%** before JLCPCB assembled
+cost what MacroFab quoted; it is 35%.
 
-So $83 buys 1280 placements, about **6.5 cents each**. The gate works out at
-17 cents. Both are cheap against doing it by hand, and this board is far the
-better candidate — 128 placements per board, including two TSSOP-10s.
+Bare board only: OSH Park prices 4-layer by area at roughly $10/in², and the
+logger is about 15 in², so three boards would exceed $100 against $13 for
+ten. Advanced Circuits, Sunstone, Bay Area Circuits and Royal Circuits are
+all real, all 5–20× for prototype quantities. Screaming Circuits, PCB:NG and
+Tempo do assembly at MacroFab-like levels.
 
-The $156.55 hand figure uses the marginal parts cost, since the combined LCSC
-order is going in anyway. A logger-only parts order paying its own minimums
-would be $163.25, putting hand assembly at $176.25 and narrowing the gap to
-$63.
+US board fab is not close, and the tariff does not make it close.
+oor stays open.
 
-**Both boards assembled: $315.12.** The six through-hole lines are hand-fitted
-either way — Economic PCBA is SMT top-side only — so they are common to both
-routes and cancel out of the comparison.
-Ω at 1 %, others 0.1 %** | **0.235 %** | **0.136 %** | **$1.21** |
-| all 0.1 % | 0.167 % | 0.113 % | $2.68 |
-
-For reference the ADS1115's own gain error is 0.15 % typical and 0.30 %
+Worth knowing that all 19 Yageo part numbers that script *constructs* from
+Yageo's own scheme came back **Exact** matches at Octopart, which validates
+the scheme end to end.
+eference the ADS1115's own gain error is 0.15 % typical and 0.30 %
 maximum, so the middle row puts the divider just under the converter — the
 point past which spending more stops buying anything. It saves $1.47 against
 all-0.1 % and needs no calibration.
