@@ -36,6 +36,9 @@ PROJ = os.path.abspath(os.path.join(HERE, ".."))
 LEDGER = os.path.join(PROJ, "fab", "lcsc-moq.csv")
 
 
+FIELDS = ["LCSC", "MOQ", "Multiple", "MPN", "Manufacturer", "Package"]
+
+
 def load(path):
     out = {}
     if not os.path.exists(path):
@@ -44,7 +47,9 @@ def load(path):
         for r in csv.DictReader(fh):
             out[r["LCSC"].strip()] = (int(r["MOQ"] or 1),
                                       int(r["Multiple"] or 1),
-                                      r.get("MPN", ""))
+                                      r.get("MPN", ""),
+                                      r.get("Manufacturer", ""),
+                                      r.get("Package", ""))
     return out
 
 
@@ -69,7 +74,14 @@ def main():
                 except ValueError:
                     continue
                 mpn = (r.get("MPN") or "").strip()
-                new = (moq, mult, mpn)
+                # Manufacturer and package ride along because a cart export
+                # is the only place this project sees them, and MacroFab
+                # wants an MPN and a package rather than an LCSC code. One
+                # ledger, fed from the same round trips, instead of a second
+                # file that has to be kept in step.
+                new = (moq, mult, mpn,
+                       (r.get("Manufacturer") or "").strip(),
+                       (r.get("Package") or "").strip())
                 old = table.get(pn)
                 if old is None:
                     added.append((pn, moq, mult, mpn))
@@ -79,10 +91,9 @@ def main():
 
     with open(LEDGER, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        w.writerow(["LCSC", "MOQ", "Multiple", "MPN"])
+        w.writerow(FIELDS)
         for pn in sorted(table):
-            moq, mult, mpn = table[pn]
-            w.writerow([pn, moq, mult, mpn])
+            w.writerow([pn] + list(table[pn]))
 
     print("fab/lcsc-moq.csv: %d parts (was %d)" % (len(table), len(before)))
     if added:
