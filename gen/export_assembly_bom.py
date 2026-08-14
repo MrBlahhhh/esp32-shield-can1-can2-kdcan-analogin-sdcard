@@ -155,7 +155,15 @@ def write(rows, base):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--other", default=OTHER_DEFAULT)
-    ap.add_argument("--out-dir", default=os.path.join(PROJ, "fab"))
+    # Each project's BOM belongs in that project's own fab/, beside the
+    # gerbers and the centroid it has to be uploaded with. Writing both into
+    # the logger's folder put the gate's BOM in the wrong repository, where
+    # it would go stale the first time the gate changed and nobody
+    # regenerated from here. --out-dir forces them together when you want
+    # one folder to upload from.
+    ap.add_argument("--out-dir", default=None,
+                    help="write both BOMs here instead of in each "
+                         "project's own fab/")
     args = ap.parse_args()
 
     ledger = load_ledger()
@@ -168,7 +176,8 @@ def main():
             continue
         rows, unresolved = read_bom(src, ledger)
         n, dupes = check_designators(rows)
-        base = os.path.join(args.out_dir, "assembly-bom-%s" % name)
+        out_dir = args.out_dir or os.path.join(proj, "fab")
+        base = os.path.join(out_dir, "assembly-bom-%s" % name)
         write(rows, base)
         print("%-7s %2d lines, %3d designators -> %s.xlsx"
               % (name, len(rows), n, os.path.basename(base)))
