@@ -44,6 +44,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ = os.path.abspath(os.path.join(HERE, ".."))
+# The other project sharing the order. Named, not guessed -- same as
+# export_combined_order.OTHER_DEFAULT.
+OTHER_PROJ = r"C:\Projects\gatecontrol\hw"
 
 # Footprint on the board -> tokens that may legitimately appear as the
 # part's package. Several packages have two common spellings and LCSC uses
@@ -166,6 +169,22 @@ def live_cart(part_numbers):
     return out, missing
 
 
+def bom_parts():
+    """Every part number named by either project's own assembly BOM, in the
+    same {Comment, Footprint} shape the combined order uses."""
+    out = {}
+    for proj in (PROJ, OTHER_PROJ):
+        path = os.path.join(proj, "fab", "bom.csv")
+        if not os.path.exists(path):
+            continue
+        for r in csv.DictReader(open(path, encoding="utf-8")):
+            pn = (r.get("JLCPCB Part #") or "").strip()
+            if pn:
+                out[pn] = {"Comment": r.get("Comment", ""),
+                           "Footprint": r.get("Footprint", "")}
+    return out
+
+
 def swap_map():
     """{original part number: the one check_stock substituted for it}."""
     path = os.path.join(PROJ, "fab", "order-verified.csv")
@@ -190,10 +209,23 @@ def main():
         print(__doc__)
         return 2
     design_path = os.path.join(PROJ, "fab", "order-combined.csv")
+    design = {r["LCSC"].strip(): r
+              for r in csv.DictReader(open(design_path, encoding="utf-8"))}
     missing = []
     if sys.argv[1] == "--live":
-        pns = [r["LCSC"].strip()
-               for r in csv.DictReader(open(design_path, encoding="utf-8"))]
+        # The combined order holds only the numbers it KEPT. Where the two
+        # projects named different parts for one value, the loser is dropped
+        # before it reaches this file and is never checked -- which is how
+        # three wrong numbers survived in the gate board: an 0805 capacitor
+        # on a 1206 land, a 100k that is not in the catalogue, and C79666,
+        # an IR2153S half-bridge gate driver standing in for a PTC fuse.
+        # Consolidation replaced all three with the logger's numbers, so the
+        # cart was correct and the design was not.
+        #
+        # So check every number each project's own BOM names, not just the
+        # survivors.
+        design.update(bom_parts())
+        pns = list(design)
         # check_stock may have replaced a short line. The replacement is what
         # actually gets pasted, so it is the thing that needs checking -- and
         # it is the line least likely to have had a human look at it, because
@@ -206,8 +238,6 @@ def main():
         cart = {r["LCSC#"].strip(): r
                 for r in csv.DictReader(open(sys.argv[1],
                                              encoding="utf-8-sig"))}
-    design = {r["LCSC"].strip(): r
-              for r in csv.DictReader(open(design_path, encoding="utf-8"))}
 
     problems, blind, checked = [], [], 0
     for pn, d in design.items():

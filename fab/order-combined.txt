@@ -85,15 +85,6 @@ losing a part actually stops the build.
   Ordering the two projects separately would take 4314 pieces.
   Combining saves 420 pieces of minimum-order padding.
 
-Consolidated -- same value and package, two part numbers
-----------------------------------------------------------
-  Each pair below was ordered as ONE line. Equivalent by
-  what the two designs say about them; check before you
-  order, because a pair can also mean one is just wrong.
-    22uF 16V       C_1206                  use C12891    not C45783
-    MF-MSMF050-2   R_1812_4532Metric       use C17313    not C79666
-    100k           R_0805                  use C149504   not C17407
-
 Through-hole, also from LCSC -- same basket
 ----------------------------------------------------------
   C10790    x10   AC-input optocoupler, DIP-4, LTV-814           gate U2
