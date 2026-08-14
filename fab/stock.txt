@@ -1,0 +1,34 @@
+Stock check -- order-combined.csv
+==============================================================
+
+  in stock for the quantity needed : 61
+  short                            : 1
+  not in the index                 : 2
+
+SHORT -- cannot cover the order
+--------------------------------------------------------------
+  C856630   need 100    stock 11        10k 0.1%
+        -> C5159707  FRH0805B1002TS         stock 456538          $0.0147
+        -> C110775   RT0805BRD0710KL        stock 389606          $0.0389
+        -> C406725   ARG05BTC1002           stock 145905          $0.0288
+
+NOT IN THE INDEX -- check on LCSC directly
+--------------------------------------------------------------
+  Absent from JLCPCB's assembly library is not the same
+  as unbuyable; most of these are stocked at LCSC.
+  C29055    need 100    100nF 100V
+  C1794     need 100    15pF 50V
+
+Substitutions above are SUGGESTIONS. Check tolerance and
+voltage before taking one: a 5%% part is a fine pull-up and
+a bad feedback divider, and this tool cannot tell which a
+given resistor is.
+
+SWAPPED in fab/order-verified-paste.txt
+--------------------------------------------------------------
+  C856630   -> C5159707  10k 0.1%        11 -> 456538 in stock
+  C29055    -> C28233    100nF 100V      unknown -> 243637 in stock
+  C1794     -> C107110   15pF 50V        unknown -> 267085 in stock
+
+  That file is the one to paste. It is the same order
+  with these lines replaced by something buyable.
