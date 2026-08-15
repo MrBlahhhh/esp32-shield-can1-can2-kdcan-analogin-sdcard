@@ -128,8 +128,15 @@ wrong board.
 ## Wanted, not yet built
 
 [`docs/TODO.md`](docs/TODO.md) — additions nobody has started, as opposed to
-the defects below. Currently exhaust gas temperature through an MCP9600 on
-the I2C header, which needs no board change and is entirely firmware work.
+the defects below, plus the state of the paused parts order. Currently two
+sensor additions, and **neither needs a board change**:
+
+- **Exhaust gas temperature** through an MCP9600 on the I2C header. Entirely
+  firmware.
+- **Wideband AFR** from a DIY-EFI TinyWB. Its 0–5 V output drops straight
+  into a sensor channel with nothing to change at all — that is the input
+  the analogue front end was designed around. The open question is its
+  10–20 AFR scaling, which clips anything richer than 10.0.
 
 ## Known open
 

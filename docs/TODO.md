@@ -53,6 +53,64 @@ State as of 14 Aug 2026, all verified:
 
 ---
 
+## Wideband AFR, via a DIY-EFI TinyWB
+
+**Status:** analogue path needs nothing. Serial path costs a GPIO and is
+probably not worth it. <https://diy-efi.co.uk/product/tinywb_module>
+
+An LSU 4.9 controller, 17 × 21 mm, giving a **0–5 V analogue output scaled
+10–20 AFR** plus a custom serial protocol.
+
+### The analogue route works as-built
+
+This is the sensor the analogue front end was designed around — the schematic
+says so in as many words: "AFR on a 0-5 V wideband output".
+
+| | |
+|---|---|
+| Signal | `AIN1_IN`–`AIN4_IN`, pins 3/4/7/8 of the 10-way sensor harness |
+| Scaling | 5 V lands at 0.836 V through the fixed 0–16 V divider — 6688 counts on the ADS1115, **0.75 mV** referred to input, about **0.0003 AFR** |
+| Ground | `SENS_RTN` on pins 5/6 is a Kelvin sense that subtracts out exhaust-to-chassis offset. On a sensor bolted to the manifold that is not a nicety |
+| Power | `+5VS` on pins 1/2 |
+
+**The 0.2 A PTC on `+5VS` is not a problem, despite appearances.** The LSU
+4.9 heater takes amps, but it runs from **a fused 12 V supply at the sensor
+connector** — the module's own 5 V is logic only. Worth writing down because
+the first look at this said the rail could not do it.
+
+### Range, not resolution, is the thing to check
+
+0–5 V maps to **10–20 AFR**, and 10.0 AFR is λ 0.68. A turbo car at WOT
+commonly sits 10.5–11.0, so the useful data is near the bottom of the range
+and **anything richer than 10 AFR clips**. The resolution is absurdly good
+either way; the range is the exposure.
+
+**Ask DIY-EFI whether the analogue scaling is configurable** before doing
+anything else. Many controllers rescale 0–5 V to something like 8–18 AFR,
+which fixes this for free.
+
+### The serial route, if the range turns out to be fixed
+
+Three obstacles, worst first:
+
+- **No spare GPIO.** All 24 usable DevKitC-1 pins are allocated. A UART means
+  taking a pin off something else.
+- **The one UART on a connector will not read TTL.** K-line is IO1/IO2 and
+  reaches the aux harness, but its RX divider is 22 k/10 k, sized for 9–16 V
+  automotive levels. 5 V TTL through it lands at **1.56 V** against a 2.48 V
+  worst-case input-high threshold. Swapping to 6.8 k/10 k gives 2.98 V and
+  costs you K-line.
+- **The protocol is "custom"** and not publicly documented.
+
+Cheaper pins to trade, if it comes to it: the WS2812 shift-light output on
+J6 (IO48, already 5 V-capable through its buffer) or the Qwiic I²C pins on
+J5. Both are on headers.
+
+Same conclusion as [the EGT note](#exhaust-gas-temperature-via-mcp9600):
+no board change either way. The decision is which GPIO you are willing to
+lose, and it should not be made until the analogue range question is
+answered.
+
 ## Exhaust gas temperature, via MCP9600
 
 **Status:** scoped, not started. **Needs no board change.**
